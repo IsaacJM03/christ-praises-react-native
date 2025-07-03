@@ -7,7 +7,7 @@ export const theme = {
     gray: '#e3e3e3',
 
     text: '#494949',
-    textLight: '#7c7c7c',
+    textLight: '#f5f5f5', // much lighter than gray
     textDark: '#1d1d1d',
 
     rose: '#ef4444',
