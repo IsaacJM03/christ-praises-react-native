@@ -1,4 +1,4 @@
-import { StyleSheet, Text, TextInput, View } from 'react-native'
+import { Alert, Pressable, StyleSheet, Text, TextInput, View } from 'react-native'
 import React, { useRef, useState } from 'react'
 import ScreenWrapper from '../components/ScreenWrapper'
 import Home from '../assets/icons/Home'
@@ -16,11 +16,15 @@ const Login = () => {
   const emailRef = useRef("");
   const passwordRef = useRef("");
   const [loading,setLoading] = useState(false);
-  const onSubmit = () => {
-    
+  const onSubmit = async () => {
+    if (!emailRef.current || !passwordRef.current) {
+      Alert.alert('Login','Please fill all fields');
+      return;
+    }
+    // good to go
   }
   return (
-    <ScreenWrapper>
+    <ScreenWrapper bg="white">
       <StatusBar style='dark' />
       <View style={styles.container}>
         <BackButton router={router}/>
@@ -55,6 +59,13 @@ const Login = () => {
             onPress={onSubmit}
             loading={loading}
           />
+        </View>
+        {/* footer */}
+        <View style={styles.footer}>
+          <Text style={styles.footerText}>Don't have an account?</Text>
+          <Pressable onPress={()=>router.push('signUp')}>
+            <Text style={[styles.footerText, {color: theme.colors.primaryDark, fontWeight:theme.fonts.semibold}]}>Sign Up</Text>
+          </Pressable>
         </View>
       </View>
     </ScreenWrapper>
