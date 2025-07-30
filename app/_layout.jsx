@@ -11,7 +11,7 @@ const _layout = () => {
       <MainLayout />
     </AuthProvider>
   )
-}
+} 
 const MainLayout = () => {
   const {setAuth} = useAuth();
   const router = useRouter();
