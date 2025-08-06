@@ -5,12 +5,12 @@ import ScreenWrapper from '../../components/ScreenWrapper'
 import { supabase } from '../../lib/supabase'
 import { hp, wp } from '../../helpers/common'
 import { theme } from '../../constants/theme'
-import Icon from '../../components/Icon'
+import Icon from '../../assets/icons'
 import { useRouter } from 'expo-router'
 import Avatar from '../../components/Avatar'
 
 const Home = () => {
-    const {setAuth} = useAuth()
+    const {user,setAuth} = useAuth()
     const router = useRouter();
     const onLogout = async ()=>{
         // setAuth(null);
