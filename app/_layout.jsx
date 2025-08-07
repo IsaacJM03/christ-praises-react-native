@@ -17,7 +17,7 @@ const MainLayout = () => {
   const router = useRouter();
 
   useEffect(() => {
-    supabase.auth.onAuthStateChange((event, session) => {
+    supabase.auth.onAuthStateChange((_event, session) => {
       // setSession(session);
       console.log('session user:', session?.user); 
       if(session) {

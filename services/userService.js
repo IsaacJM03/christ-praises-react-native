@@ -6,6 +6,7 @@ export const getUserData = async (userId) => {
         .from('users')
         .select()
         .eq('id',userId)
+        .single();
         if(error){
             return {success:false, msg:error?.message}
         }

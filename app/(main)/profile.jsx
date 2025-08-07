@@ -1,4 +1,4 @@
-import { Alert, StyleSheet, Text, TouchableOpacity, View } from 'react-native'
+import { Alert, Pressable, StyleSheet, Text, TouchableOpacity, View } from 'react-native'
 import React from 'react'
 import { useAuth } from '../../contexts/AuthContext'
 import { useRouter } from 'expo-router';
@@ -8,6 +8,7 @@ import { hp, wp } from '../../helpers/common';
 import Icon from '../../assets/icons';
 import { theme } from '../../constants/theme';
 import { supabase } from '../../lib/supabase';
+import Avatar from '../../components/Avatar';
 
 const Profile = () => {
   const { user, setAuth } = useAuth();
@@ -45,11 +46,36 @@ const UserHeader = ({ user, router, handleLogout }) => {
   return (
     <View style={{ flex: 1, backgroundColor: 'white', paddingHorizontal: wp(4) }}>
       <View>
-        <Header title="Profile" showBackButton={true}></Header>
+        <Header title="Profile" mb={30}></Header>
         <TouchableOpacity style={styles.logoutButton} onPress={handleLogout} >
           <Icon name='logout' color={theme.colors.rose} />
         </TouchableOpacity>
       </View>
+      <View style={styles.container}>
+        <View style={{gap: 15}}>
+          <View style={styles.avatarContainer}>
+            <Avatar uri={user?.image} size={hp(12)} rounded={theme.radius.xxl * 1.4} />
+            <Pressable style={styles.editIcon} onPress={() => router.push('/editProfile')}>
+              <Icon name='edit' size={20} strokeWidth={2.5} color={theme.colors.textDark} />
+            </Pressable>  
+          </View>
+
+          {/* username and address */}
+          <View style={{alignItems: 'center', gap: 4}}>
+            <Text style={styles.userName}>{user && user.name}</Text>
+            <Text style={styles.infoText}>{user && user.address}</Text>
+          </View>
+
+          {/* email,phone,bio */}
+          <View style={{gap:10}}>
+            <View style={styles.info}>
+              <Icon name='mail' size={20} strokeWidth={2} color={theme.colors.textDark} />
+              <Text style={styles.infoText}>{user && user.email}</Text>
+            </View>
+          </View>
+
+        </View>
+      </View> 
     </View>
   )
 }
@@ -78,7 +104,7 @@ const styles = StyleSheet.create({
     padding: 7,
     borderRadius: 50,
     backgroundColor: 'white',
-    shadowColor: theme.colors.textLight,
+    shadowColor: theme.colors.textDark,
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.4,
     shadowRadius: 5,
