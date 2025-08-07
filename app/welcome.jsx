@@ -19,7 +19,8 @@ const Welcome = () => {
           {/*title*/}
           <View style={{gap: 20}}>
             <Text style={styles.title}>Christ Praises</Text>
-            <Text style={styles.punchline}>Lorem ipsum dolor sit amet, consectetur adipiscing elit. Donec auctor, turpis nec aliquam.</Text>
+            <Text style={styles.punchline}>And they overcame him by the blood of the Lamb, and by the word of their testimony; and they loved not their lives unto the death.</Text>
+            <Text style={styles.reference}>Revelation 7:12</Text>
           </View>
 
           {/*footer*/}
@@ -83,5 +84,10 @@ const styles = StyleSheet.create({
   loginText: {
     color: theme.colors.text,
     fontSize: hp(1.7),
-  }
+  },
+  reference: {
+    color: theme.colors.textDark,
+    fontSize: hp(1.9),
+    textAlign: 'center',
+  },
 })

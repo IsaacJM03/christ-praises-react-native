@@ -72,6 +72,23 @@ const UserHeader = ({ user, router, handleLogout }) => {
               <Icon name='mail' size={20} strokeWidth={2} color={theme.colors.textDark} />
               <Text style={styles.infoText}>{user && user.email}</Text>
             </View>
+            {
+              user && user.phoneNumber && (
+                <View style={styles.info}>
+                  <Icon name='call' size={20} strokeWidth={2} color={theme.colors.textDark} />
+                  <Text style={styles.infoText}>{user && user.phoneNumber}</Text>
+                </View>
+              )
+            }
+            
+            {
+              user && user.bio && (
+                <View style={styles.infoText}>
+                  <Icon name='info' size={20} strokeWidth={2} color={theme.colors.textDark} />
+                  <Text style={styles.infoText}>{user && user.bio}</Text>
+                </View>
+              )
+            }
           </View>
 
         </View>
