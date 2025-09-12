@@ -1,4 +1,4 @@
-import { Button, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native'
+import { Alert, Button, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native'
 import React, { useEffect, useState } from 'react'
 import ScreenWrapper from '../../components/ScreenWrapper'
 import {hp,wp} from '../../helpers/common'
@@ -35,6 +35,17 @@ const EditProfile = () => {
   }, [currentUser]);
   const onPickImage = async () => {
     // open image picker
+  }
+
+  const onSubmit = async () => {
+    let userData = {...user};
+    let {name,phoneNumber,address,image,bio} = userData;
+    if(!name || !phoneNumber || !address){
+      Alert.alert('Profile','Please fill in all required fields');
+      return;
+    }
+    setLoading(true);
+    // update user
   }
 
   let imageSource = getUserImageSrc(user.image);
