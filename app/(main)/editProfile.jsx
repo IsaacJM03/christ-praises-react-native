@@ -1,4 +1,4 @@
-import { Alert, Button, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native'
+import { Alert, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native'
 import React, { useEffect, useState } from 'react'
 import ScreenWrapper from '../../components/ScreenWrapper'
 import {hp,wp} from '../../helpers/common'
@@ -9,6 +9,7 @@ import Image from '../../assets/icons/Image'
 import Icon from '../../assets/icons'
 import { useAuth } from '../../contexts/AuthContext'
 import Input from '../../components/Input'
+import Button from '../../components/Button'
 
 const EditProfile = () => {
   const {user:currentUser} = useAuth();
@@ -53,17 +54,17 @@ const EditProfile = () => {
     <ScreenWrapper bg="white">
       <View style={styles.container}>
         <ScrollView style={{flex: 1}}>
-          <Header title="Edit Profile">
+          <Header title="Edit Profile"/>
           {/* form */}
           <View style={styles.form}>
             <View style={styles.avatarContainer}>
               <Image source={imageSource} style={styles.avatar}/>
               <Pressable style={styles.cameraIcon} onPress={onPickImage}>
-                <Icon name="camera" size={20} strokeWidth={2.5} color={theme.colors.text} />
+                <Icon name="camera" size={20} strokeWidth={2.5} color={theme.colors.textDark} />
               </Pressable>
             </View>
 
-            <Text style={{fontSize: hp(1.5),color: theme.colors.text}}>
+            <Text style={{fontSize: hp(1.5),color: theme.colors.textDark}}>
               Please fill in your profile details
             </Text>
             <Input
@@ -94,12 +95,8 @@ const EditProfile = () => {
 
             <Button title="Update" loading={loading} onPress={onSubmit} />
           </View>
-          
-
-          </Header>
         </ScrollView>
       </View>
-      <Text>EditProfile</Text>
     </ScreenWrapper>
   )
 }

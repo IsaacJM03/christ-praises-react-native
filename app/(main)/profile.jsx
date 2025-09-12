@@ -140,7 +140,7 @@ const styles = StyleSheet.create({
   infoText: {
     fontSize: hp(1.6),
     fontWeight: '500',
-    color: theme.colors.textLight
+    color: theme.colors.textDark
   },
   logoutButton: {
     position: 'absolute',
@@ -156,6 +156,6 @@ const styles = StyleSheet.create({
   noPosts: {
     fontSize: hp(2),
     textAlign: 'center',
-    color: theme.colors.text
+    color: theme.colors.textDark
   }
 })
