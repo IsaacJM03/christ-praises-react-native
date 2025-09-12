@@ -1,10 +1,93 @@
-import { StyleSheet, Text, View } from 'react-native'
-import React from 'react'
+import { Button, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native'
+import React, { useEffect, useState } from 'react'
 import ScreenWrapper from '../../components/ScreenWrapper'
+import {hp,wp} from '../../helpers/common'
+import { theme } from '../../constants/theme'
+import { getUserImageSrc } from '../../services/imageService'
+import Header from '../../components/Header'
+import Image from '../../assets/icons/Image'
+import Icon from '../../assets/icons'
+import { useAuth } from '../../contexts/AuthContext'
+import Input from '../../components/Input'
 
 const EditProfile = () => {
+  const {user:currentUser} = useAuth();
+  const [loading,setLoading] = useState(false);
+
+  const [user,setUser] = useState({
+    name: '',
+    phoneNumber: '',
+    image: null,
+    bio: '',
+    address: ''
+  });
+
+  useEffect(() => {
+    if (currentUser) {
+      setUser({
+        name: currentUser.name || '',
+        phoneNumber: currentUser.phoneNumber || '',
+        image: currentUser.image || null,
+        bio: currentUser.bio || '',
+        address: currentUser.address || ''
+      });     
+    }
+  }, [currentUser]);
+  const onPickImage = async () => {
+    // open image picker
+  }
+
+  let imageSource = getUserImageSrc(user.image);
   return (
-    <ScreenWrapper>
+    <ScreenWrapper bg="white">
+      <View style={styles.container}>
+        <ScrollView style={{flex: 1}}>
+          <Header title="Edit Profile">
+          {/* form */}
+          <View style={styles.form}>
+            <View style={styles.avatarContainer}>
+              <Image source={imageSource} style={styles.avatar}/>
+              <Pressable style={styles.cameraIcon} onPress={onPickImage}>
+                <Icon name="camera" size={20} strokeWidth={2.5} color={theme.colors.text} />
+              </Pressable>
+            </View>
+
+            <Text style={{fontSize: hp(1.5),color: theme.colors.text}}>
+              Please fill in your profile details
+            </Text>
+            <Input
+              icon={<Icon name="user"/>}
+              placeholder="Enter Your Name"
+              value={user.name}
+              onChangeText={value => setUser({...user,name: value})}
+            />
+            <Input
+              icon={<Icon name="call"/>}
+              placeholder="Enter Your Phone Number"
+              value={user.phoneNumber}
+              onChangeText={value => setUser({...user,phoneNumber: value})}
+            />
+            <Input
+              icon={<Icon name="location"/>}
+              placeholder="Enter Your Address"
+              value={user.address}
+              onChangeText={value => setUser({...user,address: value})}
+            />
+            <Input
+              placeholder="Enter Your Bio"
+              value={user.bio}
+              multiline={true}
+              containerStyle={styles.bio}
+              onChangeText={value => setUser({...user,bio: value})}
+            />
+
+            <Button title="Update" loading={loading} onPress={onSubmit} />
+          </View>
+          
+
+          </Header>
+        </ScrollView>
+      </View>
       <Text>EditProfile</Text>
     </ScreenWrapper>
   )
