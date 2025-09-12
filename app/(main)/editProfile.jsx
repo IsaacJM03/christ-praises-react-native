@@ -10,6 +10,7 @@ import Icon from '../../assets/icons'
 import { useAuth } from '../../contexts/AuthContext'
 import Input from '../../components/Input'
 import Button from '../../components/Button'
+import updateUser from '../../services/userService'
 
 const EditProfile = () => {
   const {user:currentUser} = useAuth();
@@ -47,6 +48,8 @@ const EditProfile = () => {
     }
     setLoading(true);
     // update user
+    const res = await updateUser(currentUser?.id,userData);
+    console.log('update user result:',res)
   }
 
   let imageSource = getUserImageSrc(user.image);
