@@ -7,14 +7,16 @@ import { getUserImageSrc } from '../../services/imageService'
 import Header from '../../components/Header'
 import Image from '../../assets/icons/Image'
 import Icon from '../../assets/icons'
-import { useAuth } from '../../contexts/AuthContext'
+import { useAuth,setUserData } from '../../contexts/AuthContext'
 import Input from '../../components/Input'
 import Button from '../../components/Button'
 import updateUser from '../../services/userService'
+import { useRouter } from 'expo-router'
 
 const EditProfile = () => {
-  const {user:currentUser} = useAuth();
+  const {user:currentUser,setUserData} = useAuth();
   const [loading,setLoading] = useState(false);
+  const router = useRouter();
 
   const [user,setUser] = useState({
     name: '',
@@ -49,7 +51,14 @@ const EditProfile = () => {
     setLoading(true);
     // update user
     const res = await updateUser(currentUser?.id,userData);
+    setLoading(false);
     console.log('update user result:',res)
+
+    if(res.success){
+      setUserData({...currentUser,...userData});
+      router.back();
+      // Alert.alert('Profile','Profile updated successfully');
+    }
   }
 
   let imageSource = getUserImageSrc(user.image);
