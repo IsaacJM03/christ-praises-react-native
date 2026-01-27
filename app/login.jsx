@@ -10,19 +10,32 @@ import { useRouter } from 'expo-router'
 import { hp, wp } from '../helpers/common'
 import Input from '../components/Input'
 import Button from '../components/Button'
+import { authService } from '../lib/authService'
 
 const Login = () => {
   const router = useRouter();
   const emailRef = useRef("");
   const passwordRef = useRef("");
   const [loading,setLoading] = useState(false);
+  
   const onSubmit = async () => {
     if (!emailRef.current || !passwordRef.current) {
       Alert.alert('Login','Please fill all fields');
       return;
     }
-    // good to go
+    
+    setLoading(true);
+    const result = await authService.login(emailRef.current, passwordRef.current);
+    setLoading(false);
+    
+    if (result.success) {
+      Alert.alert('Success', 'Login successful!');
+      router.push('index');
+    } else {
+      Alert.alert('Login Failed', result.message);
+    }
   }
+  
   return (
     <ScreenWrapper bg="white">
       <StatusBar style='dark' />

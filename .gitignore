@@ -41,4 +41,3 @@ backend/.env
 *.tsbuildinfo
 
 app-example
-constants/index.js
