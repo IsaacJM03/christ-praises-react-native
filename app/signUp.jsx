@@ -31,7 +31,7 @@ const SignUp = () => {
     
     if (result.success) {
       Alert.alert('Success', 'Account created successfully!');
-      router.push('index');
+      router.replace('/index'); // was: router.replace('/')
     } else {
       Alert.alert('Sign Up Failed', result.message);
     }
@@ -79,7 +79,8 @@ const SignUp = () => {
         {/* footer */}
         <View style={styles.footer}>
           <Text style={styles.footerText}>Already have an account?</Text>
-          <Pressable onPress={()=>router.push('login')}>
+          <Pressable onPress={() => router.push('/login')}> 
+            {/* was: router.push('login') */}
             <Text style={[styles.footerText, {color: theme.colors.primaryDark, fontWeight:theme.fonts.semibold}]}>Login</Text>
           </Pressable>
         </View>

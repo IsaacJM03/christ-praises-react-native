@@ -29,8 +29,11 @@ const Login = () => {
     setLoading(false);
     
     if (result.success) {
-      Alert.alert('Success', 'Login successful!');
-      router.push('index');
+      Alert.alert(
+        'Success',
+        'Login successful!',
+        [{ text: 'OK', onPress: () => router.replace('/') }] // was: router.push('/index')
+      );
     } else {
       Alert.alert('Login Failed', result.message);
     }
@@ -76,7 +79,7 @@ const Login = () => {
         {/* footer */}
         <View style={styles.footer}>
           <Text style={styles.footerText}>Don't have an account?</Text>
-          <Pressable onPress={()=>router.push('signUp')}>
+          <Pressable onPress={() => router.push('/signUp')}>
             <Text style={[styles.footerText, {color: theme.colors.primaryDark, fontWeight:theme.fonts.semibold}]}>Sign Up</Text>
           </Pressable>
         </View>
