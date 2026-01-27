@@ -10,6 +10,7 @@ import { useRouter } from 'expo-router'
 import { hp, wp } from '../helpers/common'
 import Input from '../components/Input'
 import Button from '../components/Button'
+import { authService } from '../lib/authService'
 
 const SignUp = () => {
   const router = useRouter();
@@ -17,13 +18,25 @@ const SignUp = () => {
   const nameRef = useRef("");
   const passwordRef = useRef("");
   const [loading,setLoading] = useState(false);
+  
   const onSubmit = async () => {
-    if (!emailRef.current || !passwordRef.current) {
+    if (!emailRef.current || !passwordRef.current || !nameRef.current) {
       Alert.alert('Sign Up','Please fill all fields');
       return;
     }
-    // good to go
+    
+    setLoading(true);
+    const result = await authService.register(nameRef.current, emailRef.current, passwordRef.current);
+    setLoading(false);
+    
+    if (result.success) {
+      Alert.alert('Success', 'Account created successfully!');
+      router.replace('/index'); // was: router.replace('/')
+    } else {
+      Alert.alert('Sign Up Failed', result.message);
+    }
   }
+  
   return (
     <ScreenWrapper bg="white">
       <StatusBar style='dark' />
@@ -66,7 +79,8 @@ const SignUp = () => {
         {/* footer */}
         <View style={styles.footer}>
           <Text style={styles.footerText}>Already have an account?</Text>
-          <Pressable onPress={()=>router.push('login')}>
+          <Pressable onPress={() => router.push('/login')}> 
+            {/* was: router.push('login') */}
             <Text style={[styles.footerText, {color: theme.colors.primaryDark, fontWeight:theme.fonts.semibold}]}>Login</Text>
           </Pressable>
         </View>
