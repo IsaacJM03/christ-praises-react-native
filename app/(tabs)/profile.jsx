@@ -5,6 +5,7 @@ import {
   Text,
   ScrollView,
   Alert,
+  Pressable,
 } from 'react-native';
 import Animated, {
   FadeInDown,
@@ -21,6 +22,7 @@ import { theme } from '../../constants/theme';
 import { hp } from '../../helpers/common';
 import Avatar from '../../components/Avatar';
 import AnimatedCard from '../../components/AnimatedCard';
+import InteractiveLogo from '../../components/InteractiveLogo';
 import Icon from '../../assets/icons';
 
 const AnimatedScrollView = Animated.createAnimatedComponent(ScrollView);
@@ -41,6 +43,29 @@ const menuItems = [
   { id: '4', title: 'Help & Support', icon: 'comment', action: 'help' },
   { id: '5', title: 'About Christ Praises', icon: 'home', action: 'about' },
 ];
+
+// Animated menu item
+const MenuItem = ({ item, index, onPress }) => {
+  return (
+    <AnimatedCard
+      key={item.id}
+      delay={300 + index * 50}
+      style={styles.menuItem}
+      onPress={onPress}
+    >
+      <View style={styles.menuIconContainer}>
+        <Icon name={item.icon} size={22} color={theme.colors.primary} />
+      </View>
+      <Text style={styles.menuTitle}>{item.title}</Text>
+      <Icon
+        name="arrowLeft"
+        size={18}
+        color={theme.colors.grayMedium}
+        style={{ transform: [{ rotate: '180deg' }] }}
+      />
+    </AnimatedCard>
+  );
+};
 
 const Profile = () => {
   const router = useRouter();
@@ -66,6 +91,13 @@ const Profile = () => {
     switch (action) {
       case 'edit':
         Alert.alert('Edit Profile', 'Profile editing coming soon!');
+        break;
+      case 'about':
+        Alert.alert(
+          'About Christ Praises',
+          'Christ Praises v1.0.0\n\nA community app for believers to connect, share, and grow in faith together.\n\nMade with ❤️ for the community.',
+          [{ text: 'OK' }]
+        );
         break;
       case 'logout':
         Alert.alert('Logout', 'Are you sure you want to logout?', [
@@ -97,6 +129,21 @@ const Profile = () => {
     </Animated.View>
   );
 
+  const renderAboutSection = () => (
+    <Animated.View entering={FadeInDown.delay(700)} style={styles.aboutSection}>
+      <View style={styles.aboutHeader}>
+        <InteractiveLogo mode="home" size={hp(8)} motionIntensity={0.5} />
+        <View style={styles.aboutTextContainer}>
+          <Text style={styles.aboutTitle}>Christ Praises</Text>
+          <Text style={styles.aboutVersion}>Version 1.0.0</Text>
+        </View>
+      </View>
+      <Text style={styles.aboutDescription}>
+        A community app for believers to connect, share their journey, lift each other up, and celebrate God's grace together.
+      </Text>
+    </Animated.View>
+  );
+
   return (
     <View style={styles.container}>
       <StatusBar style="light" />
@@ -118,7 +165,10 @@ const Profile = () => {
           <Animated.View entering={FadeInDown.delay(150)}>
             <Text style={styles.userName}>{user.name}</Text>
             <Text style={styles.userEmail}>{user.email}</Text>
-            <Text style={styles.joinDate}>Member since {user.joinDate}</Text>
+            <View style={styles.memberSince}>
+              <Icon name="heart" size={14} color={theme.colors.primaryLight} />
+              <Text style={styles.joinDate}>Member since {user.joinDate}</Text>
+            </View>
           </Animated.View>
         </Animated.View>
 
@@ -126,23 +176,12 @@ const Profile = () => {
 
         <View style={styles.menuContainer}>
           {menuItems.map((item, index) => (
-            <AnimatedCard
+            <MenuItem
               key={item.id}
-              delay={300 + index * 50}
-              style={styles.menuItem}
+              item={item}
+              index={index}
               onPress={() => handleMenuPress(item.action)}
-            >
-              <View style={styles.menuIconContainer}>
-                <Icon name={item.icon} size={22} color={theme.colors.primary} />
-              </View>
-              <Text style={styles.menuTitle}>{item.title}</Text>
-              <Icon
-                name="arrowLeft"
-                size={18}
-                color={theme.colors.grayMedium}
-                style={{ transform: [{ rotate: '180deg' }] }}
-              />
-            </AnimatedCard>
+            />
           ))}
         </View>
 
@@ -157,9 +196,11 @@ const Profile = () => {
           <Text style={[styles.menuTitle, styles.logoutText]}>Logout</Text>
         </AnimatedCard>
 
+        {renderAboutSection()}
+
         <View style={styles.footer}>
-          <Text style={styles.footerText}>Christ Praises v1.0.0</Text>
-          <Text style={styles.footerSubtext}>Made with ❤️ for the community</Text>
+          <Text style={styles.footerText}>Made with ❤️ for the community</Text>
+          <Text style={styles.footerSubtext}>© {new Date().getFullYear()} Christ Praises</Text>
         </View>
       </AnimatedScrollView>
     </View>
@@ -205,12 +246,17 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     marginTop: theme.spacing.xs,
   },
+  memberSince: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginTop: theme.spacing.sm,
+    gap: theme.spacing.xs,
+  },
   joinDate: {
     fontSize: hp(1.5),
     color: theme.colors.textLight,
     opacity: 0.6,
-    textAlign: 'center',
-    marginTop: theme.spacing.xs,
   },
   statsContainer: {
     flexDirection: 'row',
@@ -273,6 +319,37 @@ const styles = StyleSheet.create({
   logoutText: {
     color: theme.colors.rose,
   },
+  aboutSection: {
+    margin: theme.spacing.md,
+    marginTop: theme.spacing.lg,
+    padding: theme.spacing.lg,
+    backgroundColor: theme.colors.card,
+    borderRadius: theme.radius.xl,
+    ...theme.shadow.sm,
+  },
+  aboutHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: theme.spacing.md,
+  },
+  aboutTextContainer: {
+    marginLeft: theme.spacing.md,
+  },
+  aboutTitle: {
+    fontSize: hp(2),
+    fontWeight: theme.fonts.bold,
+    color: theme.colors.textDark,
+  },
+  aboutVersion: {
+    fontSize: hp(1.4),
+    color: theme.colors.textMuted,
+    marginTop: 2,
+  },
+  aboutDescription: {
+    fontSize: hp(1.6),
+    color: theme.colors.text,
+    lineHeight: hp(2.4),
+  },
   footer: {
     alignItems: 'center',
     paddingTop: theme.spacing.xl,
@@ -286,6 +363,7 @@ const styles = StyleSheet.create({
     fontSize: hp(1.4),
     color: theme.colors.textMuted,
     marginTop: theme.spacing.xs,
+    opacity: 0.7,
   },
 });
 

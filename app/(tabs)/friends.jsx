@@ -11,8 +11,12 @@ import Animated, {
   FadeInDown,
   FadeInRight,
   Layout,
+  useSharedValue,
+  useAnimatedStyle,
+  withSpring,
 } from 'react-native-reanimated';
 import { StatusBar } from 'expo-status-bar';
+import { LinearGradient } from 'expo-linear-gradient';
 import { theme } from '../../constants/theme';
 import { hp } from '../../helpers/common';
 import Header from '../../components/Header';
@@ -33,6 +37,54 @@ const mockFriends = [
   { id: '8', name: 'Ashley Thomas', status: 'online', lastSeen: 'Active now' },
 ];
 
+// Animated friend item with press interaction
+const FriendItem = ({ item, index, onPress }) => {
+  const scale = useSharedValue(1);
+  
+  const animatedStyle = useAnimatedStyle(() => ({
+    transform: [{ scale: scale.value }],
+  }));
+
+  const handlePressIn = () => {
+    scale.value = withSpring(0.98, { damping: 15 });
+  };
+
+  const handlePressOut = () => {
+    scale.value = withSpring(1, { damping: 15 });
+  };
+
+  return (
+    <AnimatedPressable
+      entering={FadeInRight.delay(index * 50).duration(300)}
+      layout={Layout.springify()}
+      style={[styles.friendItem, animatedStyle]}
+      onPress={onPress}
+      onPressIn={handlePressIn}
+      onPressOut={handlePressOut}
+    >
+      <View style={styles.friendAvatarContainer}>
+        <Avatar name={item.name} size={50} />
+        {item.status === 'online' && <View style={styles.onlineBadge} />}
+      </View>
+      <View style={styles.friendInfo}>
+        <Text style={styles.friendName}>{item.name}</Text>
+        <View style={styles.statusRow}>
+          <View style={[
+            styles.statusDot, 
+            { backgroundColor: item.status === 'online' ? theme.colors.success : theme.colors.grayMedium }
+          ]} />
+          <Text style={styles.friendStatus}>{item.lastSeen}</Text>
+        </View>
+      </View>
+      <View style={styles.friendActions}>
+        <Pressable style={styles.actionButton}>
+          <Icon name="send" size={20} color={theme.colors.primary} />
+        </Pressable>
+      </View>
+    </AnimatedPressable>
+  );
+};
+
 const Friends = () => {
   const [searchQuery, setSearchQuery] = useState('');
   const [loading, setLoading] = useState(true);
@@ -50,6 +102,9 @@ const Friends = () => {
     friend.name.toLowerCase().includes(searchQuery.toLowerCase())
   );
 
+  const onlineFriends = filteredFriends.filter(f => f.status === 'online');
+  const offlineFriends = filteredFriends.filter(f => f.status === 'offline');
+
   const renderEmptyState = () => (
     <Animated.View entering={FadeInDown.delay(200)} style={styles.emptyState}>
       <View style={styles.emptyIconContainer}>
@@ -64,27 +119,13 @@ const Friends = () => {
     </Animated.View>
   );
 
-  const renderFriendItem = ({ item, index }) => (
-    <AnimatedPressable
-      entering={FadeInRight.delay(index * 50).duration(300)}
-      layout={Layout.springify()}
-      style={styles.friendItem}
-      onPress={() => {}}
-    >
-      <View style={styles.friendAvatarContainer}>
-        <Avatar name={item.name} size={50} />
-        {item.status === 'online' && <View style={styles.onlineBadge} />}
+  const renderSectionHeader = (title, count) => (
+    <Animated.View entering={FadeInDown.delay(100)} style={styles.sectionHeader}>
+      <Text style={styles.sectionTitle}>{title}</Text>
+      <View style={styles.countBadge}>
+        <Text style={styles.countText}>{count}</Text>
       </View>
-      <View style={styles.friendInfo}>
-        <Text style={styles.friendName}>{item.name}</Text>
-        <Text style={styles.friendStatus}>{item.lastSeen}</Text>
-      </View>
-      <View style={styles.friendActions}>
-        <Pressable style={styles.actionButton}>
-          <Icon name="send" size={20} color={theme.colors.primary} />
-        </Pressable>
-      </View>
-    </AnimatedPressable>
+    </Animated.View>
   );
 
   const renderSkeletons = () => (
@@ -98,11 +139,20 @@ const Friends = () => {
   return (
     <View style={styles.container}>
       <StatusBar style="dark" />
+      
+      {/* Soft gradient background */}
+      <LinearGradient
+        colors={['#f8f5f2', '#faf8f6', theme.colors.background]}
+        style={styles.backgroundGradient}
+        start={{ x: 0, y: 0 }}
+        end={{ x: 0, y: 0.2 }}
+      />
+      
       <Header
         title="Friends"
         showProfile={false}
         showNotifications={false}
-        backgroundColor={theme.colors.background}
+        backgroundColor="transparent"
       />
 
       <Animated.View entering={FadeInDown.delay(100)} style={styles.searchContainer}>
@@ -125,14 +175,25 @@ const Friends = () => {
 
       {loading ? (
         renderSkeletons()
+      ) : filteredFriends.length === 0 ? (
+        renderEmptyState()
       ) : (
         <FlatList
-          data={filteredFriends}
-          keyExtractor={(item) => item.id}
-          renderItem={renderFriendItem}
+          data={[
+            { type: 'header', title: 'Online', count: onlineFriends.length },
+            ...onlineFriends.map(f => ({ type: 'friend', data: f })),
+            { type: 'header', title: 'Offline', count: offlineFriends.length },
+            ...offlineFriends.map(f => ({ type: 'friend', data: f })),
+          ]}
+          keyExtractor={(item, index) => item.type === 'header' ? `header-${item.title}` : item.data.id}
+          renderItem={({ item, index }) => {
+            if (item.type === 'header') {
+              return renderSectionHeader(item.title, item.count);
+            }
+            return <FriendItem item={item.data} index={index} onPress={() => {}} />;
+          }}
           contentContainerStyle={styles.listContent}
           showsVerticalScrollIndicator={false}
-          ListEmptyComponent={renderEmptyState}
         />
       )}
     </View>
@@ -144,6 +205,9 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: theme.colors.background,
   },
+  backgroundGradient: {
+    ...StyleSheet.absoluteFillObject,
+  },
   searchContainer: {
     paddingHorizontal: theme.spacing.md,
     paddingBottom: theme.spacing.sm,
@@ -151,11 +215,12 @@ const styles = StyleSheet.create({
   searchInputContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: theme.colors.backgroundSecondary,
+    backgroundColor: theme.colors.card,
     borderRadius: theme.radius.lg,
     paddingHorizontal: theme.spacing.md,
     height: hp(5.5),
     gap: theme.spacing.sm,
+    ...theme.shadow.sm,
   },
   searchInput: {
     flex: 1,
@@ -168,6 +233,32 @@ const styles = StyleSheet.create({
   listContent: {
     padding: theme.spacing.md,
     paddingTop: theme.spacing.xs,
+  },
+  sectionHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: theme.spacing.md,
+    marginBottom: theme.spacing.sm,
+    paddingHorizontal: theme.spacing.xs,
+  },
+  sectionTitle: {
+    fontSize: hp(1.6),
+    fontWeight: theme.fonts.semibold,
+    color: theme.colors.textMuted,
+    textTransform: 'uppercase',
+    letterSpacing: 1,
+  },
+  countBadge: {
+    marginLeft: theme.spacing.sm,
+    backgroundColor: theme.colors.backgroundSecondary,
+    paddingHorizontal: theme.spacing.sm,
+    paddingVertical: 2,
+    borderRadius: theme.radius.full,
+  },
+  countText: {
+    fontSize: hp(1.3),
+    fontWeight: theme.fonts.medium,
+    color: theme.colors.textMuted,
   },
   friendItem: {
     flexDirection: 'row',
@@ -201,10 +292,20 @@ const styles = StyleSheet.create({
     fontWeight: theme.fonts.semibold,
     color: theme.colors.textDark,
   },
+  statusRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: 4,
+  },
+  statusDot: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+    marginRight: theme.spacing.xs,
+  },
   friendStatus: {
     fontSize: hp(1.5),
     color: theme.colors.textMuted,
-    marginTop: 2,
   },
   friendActions: {
     flexDirection: 'row',
