@@ -10,6 +10,7 @@ import { useRouter } from 'expo-router'
 import { hp, wp } from '../helpers/common'
 import FloatingInput from '../components/FloatingInput'
 import AnimatedButton from '../components/AnimatedButton'
+import InteractiveLogo from '../components/InteractiveLogo'
 import { authService } from '../lib/authService'
 
 const Login = () => {
@@ -18,6 +19,7 @@ const Login = () => {
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
   const [errors, setErrors] = useState({});
+  const [inputFocused, setInputFocused] = useState(false);
   
   const validateForm = () => {
     const newErrors = {};
@@ -59,6 +61,15 @@ const Login = () => {
             <BackButton router={router}/>
           </Animated.View>
 
+          <Animated.View entering={FadeInDown.delay(150)} style={styles.logoContainer}>
+            <InteractiveLogo 
+              mode="onboarding"
+              size={hp(12)}
+              motionIntensity={0.6}
+              isFocused={inputFocused}
+            />
+          </Animated.View>
+
           <Animated.View entering={FadeInDown.delay(200)} style={styles.header}>
             <Text style={styles.welcomeText}>Hey,</Text>
             <Text style={styles.welcomeText}>Welcome Back!</Text>
@@ -75,6 +86,8 @@ const Login = () => {
               keyboardType="email-address"
               autoCapitalize="none"
               error={errors.email}
+              onFocus={() => setInputFocused(true)}
+              onBlur={() => setInputFocused(false)}
             />
             <FloatingInput 
               label="Password"
@@ -84,6 +97,8 @@ const Login = () => {
               onChangeText={setPassword}
               secureTextEntry
               error={errors.password}
+              onFocus={() => setInputFocused(true)}
+              onBlur={() => setInputFocused(false)}
             />
             
             <Pressable style={styles.forgotPassword}>
@@ -128,15 +143,19 @@ const styles = StyleSheet.create({
   content: {
     flex: 1,
     paddingHorizontal: wp(6),
-    paddingTop: hp(8),
-    justifyContent: 'center',
+    paddingTop: hp(6),
+  },
+  logoContainer: {
+    alignItems: 'center',
+    marginTop: hp(2),
+    marginBottom: hp(1),
   },
   header: {
-    marginTop: hp(4),
-    marginBottom: hp(4),
+    marginTop: hp(2),
+    marginBottom: hp(3),
   },
   welcomeText: {
-    fontSize: hp(4),
+    fontSize: hp(3.5),
     fontWeight: theme.fonts.bold,
     color: theme.colors.textLight,
   },

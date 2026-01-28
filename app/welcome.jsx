@@ -1,4 +1,4 @@
-import { StyleSheet, Text, View, Image } from 'react-native'
+import { StyleSheet, Text, View } from 'react-native'
 import React from 'react'
 import Animated, { FadeInDown, FadeInUp } from 'react-native-reanimated'
 import { LinearGradient } from 'expo-linear-gradient'
@@ -6,6 +6,7 @@ import { StatusBar } from 'expo-status-bar'
 import { hp, wp } from '../helpers/common'
 import { theme } from '../constants/theme'
 import AnimatedButton from '../components/AnimatedButton'
+import InteractiveLogo from '../components/InteractiveLogo'
 import { useRouter } from 'expo-router'
 
 const Welcome = () => {
@@ -21,10 +22,10 @@ const Welcome = () => {
       
       <View style={styles.content}>
         <Animated.View entering={FadeInUp.delay(200).duration(600)} style={styles.logoContainer}>
-          <Image 
-            style={styles.welcomeImage} 
-            resizeMode='contain' 
-            source={require('../assets/images/welcome2.png')} 
+          <InteractiveLogo 
+            mode="onboarding"
+            size={hp(24)}
+            motionIntensity={1}
           />
         </Animated.View>
 
@@ -81,10 +82,6 @@ const styles = StyleSheet.create({
   logoContainer: {
     alignItems: 'center',
     marginBottom: hp(2),
-  },
-  welcomeImage: {
-    height: hp(28),
-    width: wp(90),
   },
   textContainer: {
     alignItems: 'center',

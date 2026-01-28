@@ -5,7 +5,6 @@ import {
   Text,
   ScrollView,
   RefreshControl,
-  Image,
   Pressable,
 } from 'react-native';
 import Animated, {
@@ -14,18 +13,32 @@ import Animated, {
 } from 'react-native-reanimated';
 import { useRouter } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
+import { LinearGradient } from 'expo-linear-gradient';
 import { theme } from '../../constants/theme';
 import { hp, wp } from '../../helpers/common';
 import Header from '../../components/Header';
 import AnimatedCard from '../../components/AnimatedCard';
 import { SkeletonCard, SkeletonListItem } from '../../components/SkeletonLoader';
 import Icon from '../../assets/icons';
+import InteractiveLogo from '../../components/InteractiveLogo';
+import PopupMenu from '../../components/PopupMenu';
+import QuickPostModal from '../../components/QuickPostModal';
+import FloatingActionButton from '../../components/FloatingActionButton';
 
 const Home = () => {
   const router = useRouter();
   const [refreshing, setRefreshing] = useState(false);
   const [loading, setLoading] = useState(true);
   const [notificationCount, setNotificationCount] = useState(3);
+  
+  // Popup menu states
+  const [profileMenuVisible, setProfileMenuVisible] = useState(false);
+  const [notificationMenuVisible, setNotificationMenuVisible] = useState(false);
+  const [profileAnchor, setProfileAnchor] = useState({ x: 0, y: 0 });
+  const [notificationAnchor, setNotificationAnchor] = useState({ x: 0, y: 0 });
+  
+  // Quick post modal
+  const [quickPostVisible, setQuickPostVisible] = useState(false);
 
   useEffect(() => {
     const timer = setTimeout(() => setLoading(false), 1500);
@@ -41,13 +54,41 @@ const Home = () => {
     }, 1500);
   }, []);
 
-  const handleProfilePress = () => {
-    router.push('/profile');
+  const handleProfilePress = (event) => {
+    // Get position for popup anchoring
+    setProfileAnchor({ x: event.nativeEvent.pageX, y: event.nativeEvent.pageY });
+    setProfileMenuVisible(true);
   };
 
-  const handleNotificationPress = () => {
-    setNotificationCount(0);
+  const handleNotificationPress = (event) => {
+    setNotificationAnchor({ x: event.nativeEvent.pageX, y: event.nativeEvent.pageY });
+    setNotificationMenuVisible(true);
   };
+
+  const handleQuickPost = () => {
+    setQuickPostVisible(true);
+  };
+
+  const handlePostSubmit = async (content) => {
+    // Handle post submission
+    console.log('New post:', content);
+    // In a real app, you'd send this to your backend
+  };
+
+  // Profile menu items
+  const profileMenuItems = [
+    { id: '1', title: 'View Profile', icon: 'user', onPress: () => router.push('/profile') },
+    { id: '2', title: 'Edit Profile', icon: 'edit', onPress: () => {} },
+    { id: '3', title: 'Settings', icon: 'lock', onPress: () => {} },
+    { id: '4', title: 'Logout', icon: 'logout', danger: true, onPress: () => router.replace('/welcome') },
+  ];
+
+  // Mock notifications
+  const notifications = [
+    { id: '1', title: 'John liked your post', time: '2 min ago', read: false, onPress: () => {} },
+    { id: '2', title: 'Sarah sent you a message', time: '15 min ago', read: false, onPress: () => {} },
+    { id: '3', title: 'New community event tomorrow', time: '1 hour ago', read: true, onPress: () => {} },
+  ];
 
   const featuredContent = [
     {
@@ -138,11 +179,13 @@ const Home = () => {
   const renderWelcomeBanner = () => (
     <AnimatedCard delay={100} style={styles.welcomeBanner}>
       <View style={styles.welcomeContent}>
-        <Image
-          source={require('../../assets/images/welcome2.png')}
-          style={styles.welcomeImage}
-          resizeMode="contain"
-        />
+        <View style={styles.logoContainer}>
+          <InteractiveLogo 
+            mode="home"
+            size={hp(12)}
+            motionIntensity={0.7}
+          />
+        </View>
         <View style={styles.welcomeText}>
           <Text style={styles.welcomeTitle}>Welcome to Christ Praises</Text>
           <Text style={styles.welcomeSubtitle}>
@@ -156,14 +199,24 @@ const Home = () => {
   return (
     <View style={styles.container}>
       <StatusBar style="dark" />
+      
+      {/* Soft gradient background for better status bar visibility */}
+      <LinearGradient
+        colors={['#f8f5f2', '#faf8f6', theme.colors.background]}
+        style={styles.backgroundGradient}
+        start={{ x: 0, y: 0 }}
+        end={{ x: 0, y: 0.3 }}
+      />
+      
       <Header
         title="Christ Praises"
         notificationCount={notificationCount}
         profileName="User"
         onProfilePress={handleProfilePress}
         onNotificationPress={handleNotificationPress}
-        backgroundColor={theme.colors.background}
+        backgroundColor="transparent"
       />
+      
       <ScrollView
         style={styles.scrollView}
         contentContainerStyle={styles.scrollContent}
@@ -188,6 +241,42 @@ const Home = () => {
           </>
         )}
       </ScrollView>
+
+      {/* Floating Action Button for Quick Post */}
+      <FloatingActionButton
+        onPress={handleQuickPost}
+        icon="plus"
+        style={styles.fab}
+      />
+
+      {/* Profile Popup Menu */}
+      <PopupMenu
+        visible={profileMenuVisible}
+        onClose={() => setProfileMenuVisible(false)}
+        anchorPosition={profileAnchor}
+        items={profileMenuItems}
+        type="profile"
+        title="Account"
+      />
+
+      {/* Notifications Popup Menu */}
+      <PopupMenu
+        visible={notificationMenuVisible}
+        onClose={() => {
+          setNotificationMenuVisible(false);
+          setNotificationCount(0);
+        }}
+        anchorPosition={notificationAnchor}
+        type="notifications"
+        notifications={notifications}
+      />
+
+      {/* Quick Post Modal */}
+      <QuickPostModal
+        visible={quickPostVisible}
+        onClose={() => setQuickPostVisible(false)}
+        onSubmit={handlePostSubmit}
+      />
     </View>
   );
 };
@@ -197,12 +286,15 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: theme.colors.background,
   },
+  backgroundGradient: {
+    ...StyleSheet.absoluteFillObject,
+  },
   scrollView: {
     flex: 1,
   },
   scrollContent: {
     paddingHorizontal: theme.spacing.md,
-    paddingBottom: theme.spacing.xxl,
+    paddingBottom: theme.spacing.xxl + 80, // Extra space for FAB
   },
   skeletonContainer: {
     marginTop: theme.spacing.md,
@@ -215,29 +307,30 @@ const styles = StyleSheet.create({
   },
   welcomeBanner: {
     marginTop: theme.spacing.sm,
-    backgroundColor: theme.colors.primaryLight,
+    backgroundColor: theme.colors.card,
     padding: 0,
     overflow: 'hidden',
+    borderWidth: 1,
+    borderColor: theme.colors.backgroundSecondary,
   },
   welcomeContent: {
     padding: theme.spacing.md,
+    alignItems: 'center',
   },
-  welcomeImage: {
-    width: '100%',
-    height: hp(15),
+  logoContainer: {
     marginBottom: theme.spacing.sm,
   },
   welcomeText: {
     alignItems: 'center',
   },
   welcomeTitle: {
-    fontSize: hp(2.4),
+    fontSize: hp(2.2),
     fontWeight: theme.fonts.bold,
     color: theme.colors.textDark,
     textAlign: 'center',
   },
   welcomeSubtitle: {
-    fontSize: hp(1.7),
+    fontSize: hp(1.6),
     color: theme.colors.textMuted,
     textAlign: 'center',
     marginTop: theme.spacing.xs,
@@ -303,6 +396,10 @@ const styles = StyleSheet.create({
   },
   bottomSpacer: {
     height: theme.spacing.xl,
+  },
+  fab: {
+    bottom: 100, // Above the tab bar
+    right: theme.spacing.md,
   },
 });
 

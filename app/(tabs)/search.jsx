@@ -15,6 +15,7 @@ import Animated, {
   FadeInUp,
 } from 'react-native-reanimated';
 import { StatusBar } from 'expo-status-bar';
+import { LinearGradient } from 'expo-linear-gradient';
 import { theme } from '../../constants/theme';
 import { hp, wp } from '../../helpers/common';
 import Avatar from '../../components/Avatar';
@@ -40,6 +41,13 @@ const recentSearches = [
   'Worship music',
   'Bible study',
   'Community events',
+];
+
+const trendingTopics = [
+  { id: '1', tag: '#prayer', count: '2.4k posts' },
+  { id: '2', tag: '#faith', count: '1.8k posts' },
+  { id: '3', tag: '#gratitude', count: '950 posts' },
+  { id: '4', tag: '#testimony', count: '620 posts' },
 ];
 
 const Search = () => {
@@ -87,6 +95,22 @@ const Search = () => {
     width: searchBarWidth.value,
   }));
 
+  const renderTrendingTopics = () => (
+    <Animated.View entering={FadeInDown.delay(200)} style={styles.trendingContainer}>
+      <Text style={styles.sectionTitle}>Trending Topics</Text>
+      <View style={styles.trendingTags}>
+        {trendingTopics.map((topic, index) => (
+          <Animated.View key={topic.id} entering={FadeInDown.delay(250 + index * 50)}>
+            <Pressable style={styles.trendingTag}>
+              <Text style={styles.tagText}>{topic.tag}</Text>
+              <Text style={styles.tagCount}>{topic.count}</Text>
+            </Pressable>
+          </Animated.View>
+        ))}
+      </View>
+    </Animated.View>
+  );
+
   const renderRecentSearches = () => (
     <Animated.View entering={FadeInDown.delay(100)} style={styles.recentContainer}>
       <View style={styles.sectionHeader}>
@@ -101,8 +125,11 @@ const Search = () => {
             style={styles.recentItem}
             onPress={() => handleRecentSearch(term)}
           >
-            <Icon name="search" size={18} color={theme.colors.grayMedium} />
+            <View style={styles.recentIconContainer}>
+              <Icon name="search" size={16} color={theme.colors.grayMedium} />
+            </View>
             <Text style={styles.recentText}>{term}</Text>
+            <Icon name="arrowLeft" size={16} color={theme.colors.grayMedium} style={{ transform: [{ rotate: '135deg' }] }} />
           </Pressable>
         </Animated.View>
       ))}
@@ -122,7 +149,13 @@ const Search = () => {
               onPress={() => {}}
             >
               <Avatar name={user.name} size={44} />
-              <Text style={styles.userName}>{user.name}</Text>
+              <View style={styles.userInfo}>
+                <Text style={styles.userName}>{user.name}</Text>
+                <Text style={styles.userHandle}>@{user.name.toLowerCase().replace(' ', '')}</Text>
+              </View>
+              <Pressable style={styles.followButton}>
+                <Text style={styles.followText}>Follow</Text>
+              </Pressable>
             </AnimatedCard>
           ))}
         </View>
@@ -175,6 +208,14 @@ const Search = () => {
   return (
     <View style={styles.container}>
       <StatusBar style="dark" />
+      
+      {/* Soft gradient background */}
+      <LinearGradient
+        colors={['#f8f5f2', '#faf8f6', theme.colors.background]}
+        style={styles.backgroundGradient}
+        start={{ x: 0, y: 0 }}
+        end={{ x: 0, y: 0.2 }}
+      />
 
       <Animated.View entering={FadeInDown} style={styles.searchHeader}>
         <Animated.View style={[styles.searchInputContainer, searchBarStyle]}>
@@ -220,7 +261,18 @@ const Search = () => {
           renderEmptyResults()
         )
       ) : (
-        renderRecentSearches()
+        <FlatList
+          data={[1]}
+          keyExtractor={() => 'discover'}
+          renderItem={() => (
+            <>
+              {renderRecentSearches()}
+              {renderTrendingTopics()}
+            </>
+          )}
+          showsVerticalScrollIndicator={false}
+          keyboardShouldPersistTaps="handled"
+        />
       )}
     </View>
   );
@@ -232,6 +284,9 @@ const styles = StyleSheet.create({
     backgroundColor: theme.colors.background,
     paddingTop: hp(6),
   },
+  backgroundGradient: {
+    ...StyleSheet.absoluteFillObject,
+  },
   searchHeader: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -242,12 +297,13 @@ const styles = StyleSheet.create({
   searchInputContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: theme.colors.backgroundSecondary,
+    backgroundColor: theme.colors.card,
     borderRadius: theme.radius.lg,
     paddingHorizontal: theme.spacing.md,
     height: hp(5.5),
     gap: theme.spacing.sm,
     flex: 1,
+    ...theme.shadow.sm,
   },
   searchInput: {
     flex: 1,
@@ -288,9 +344,45 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
     borderBottomColor: theme.colors.backgroundSecondary,
   },
+  recentIconContainer: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: theme.colors.backgroundSecondary,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
   recentText: {
+    flex: 1,
     fontSize: hp(1.8),
     color: theme.colors.text,
+  },
+  trendingContainer: {
+    padding: theme.spacing.md,
+    paddingTop: 0,
+  },
+  trendingTags: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: theme.spacing.sm,
+    marginTop: theme.spacing.sm,
+  },
+  trendingTag: {
+    backgroundColor: theme.colors.card,
+    paddingHorizontal: theme.spacing.md,
+    paddingVertical: theme.spacing.sm,
+    borderRadius: theme.radius.full,
+    ...theme.shadow.sm,
+  },
+  tagText: {
+    fontSize: hp(1.6),
+    fontWeight: theme.fonts.semibold,
+    color: theme.colors.primary,
+  },
+  tagCount: {
+    fontSize: hp(1.3),
+    color: theme.colors.textMuted,
+    marginTop: 2,
   },
   loadingContainer: {
     padding: theme.spacing.md,
@@ -307,10 +399,28 @@ const styles = StyleSheet.create({
     marginTop: theme.spacing.sm,
     gap: theme.spacing.md,
   },
+  userInfo: {
+    flex: 1,
+  },
   userName: {
     fontSize: hp(1.8),
     fontWeight: theme.fonts.medium,
     color: theme.colors.textDark,
+  },
+  userHandle: {
+    fontSize: hp(1.4),
+    color: theme.colors.textMuted,
+  },
+  followButton: {
+    backgroundColor: theme.colors.primary,
+    paddingHorizontal: theme.spacing.md,
+    paddingVertical: theme.spacing.xs,
+    borderRadius: theme.radius.full,
+  },
+  followText: {
+    fontSize: hp(1.5),
+    fontWeight: theme.fonts.semibold,
+    color: 'white',
   },
   contentResult: {
     flexDirection: 'row',
