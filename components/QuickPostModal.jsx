@@ -99,7 +99,10 @@ const QuickPostModal = ({
       setContent('');
       handleClose();
     } catch (error) {
-      console.error('Failed to submit post:', error);
+      // Silent fail for demo - in production, show error toast
+      if (__DEV__) {
+        console.error('Failed to submit post:', error);
+      }
     } finally {
       setIsSubmitting(false);
     }
@@ -138,7 +141,7 @@ const QuickPostModal = ({
           {/* Header */}
           <View style={styles.header}>
             <Pressable onPress={handleClose} style={styles.closeButton}>
-              <Icon name="delete" size={22} color={theme.colors.textMuted} />
+              <Icon name="arrowLeft" size={22} color={theme.colors.textMuted} />
             </Pressable>
             <Text style={styles.headerTitle}>Quick Post</Text>
             <View style={styles.headerRight}>
@@ -160,7 +163,7 @@ const QuickPostModal = ({
               placeholder="Share what's on your heart..."
               placeholderTextColor={theme.colors.grayMedium}
               multiline
-              maxLength={maxCharacters + 50} // Allow some overflow for UX
+              maxLength={maxCharacters + 10} // Small buffer for smoother UX
               value={content}
               onChangeText={setContent}
               textAlignVertical="top"

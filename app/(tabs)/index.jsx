@@ -70,9 +70,11 @@ const Home = () => {
   };
 
   const handlePostSubmit = async (content) => {
-    // Handle post submission
-    console.log('New post:', content);
-    // In a real app, you'd send this to your backend
+    // TODO: Implement actual post submission to backend
+    // For now, just log the content for development purposes
+    if (__DEV__) {
+      console.log('New post:', content);
+    }
   };
 
   // Profile menu items

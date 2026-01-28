@@ -112,20 +112,20 @@ const Profile = () => {
 
   const renderStats = () => (
     <Animated.View entering={FadeInDown.delay(200)} style={styles.statsContainer}>
-      <Pressable style={styles.statItem}>
+      <View style={styles.statItem}>
         <Text style={styles.statValue}>{user.postsCount}</Text>
         <Text style={styles.statLabel}>Posts</Text>
-      </Pressable>
+      </View>
       <View style={styles.statDivider} />
-      <Pressable style={styles.statItem}>
+      <View style={styles.statItem}>
         <Text style={styles.statValue}>{user.friendsCount}</Text>
         <Text style={styles.statLabel}>Friends</Text>
-      </Pressable>
+      </View>
       <View style={styles.statDivider} />
-      <Pressable style={styles.statItem}>
+      <View style={styles.statItem}>
         <Text style={styles.statValue}>{user.likesCount}</Text>
         <Text style={styles.statLabel}>Likes</Text>
-      </Pressable>
+      </View>
     </Animated.View>
   );
 
@@ -200,7 +200,7 @@ const Profile = () => {
 
         <View style={styles.footer}>
           <Text style={styles.footerText}>Made with ❤️ for the community</Text>
-          <Text style={styles.footerSubtext}>© 2024 Christ Praises</Text>
+          <Text style={styles.footerSubtext}>© {new Date().getFullYear()} Christ Praises</Text>
         </View>
       </AnimatedScrollView>
     </View>
