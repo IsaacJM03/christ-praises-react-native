@@ -28,14 +28,14 @@ const Home = () => {
   const [notificationCount, setNotificationCount] = useState(3);
 
   useEffect(() => {
-    const timer = global.setTimeout(() => setLoading(false), 1500);
-    return () => global.clearTimeout(timer);
+    const timer = setTimeout(() => setLoading(false), 1500);
+    return () => clearTimeout(timer);
   }, []);
 
   const onRefresh = useCallback(() => {
     setRefreshing(true);
     setLoading(true);
-    global.setTimeout(() => {
+    setTimeout(() => {
       setRefreshing(false);
       setLoading(false);
     }, 1500);

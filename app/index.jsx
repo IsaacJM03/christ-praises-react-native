@@ -8,10 +8,10 @@ const Index = () => {
   const router = useRouter();
 
   useEffect(() => {
-    const timer = global.setTimeout(() => {
+    const timer = setTimeout(() => {
       router.replace("/welcome");
     }, 500);
-    return () => global.clearTimeout(timer);
+    return () => clearTimeout(timer);
   }, [router]);
 
   return (

@@ -1,4 +1,4 @@
-import React, { useState, useRef } from 'react';
+import React, { useState } from 'react';
 import { StyleSheet, View, TextInput, Text, Pressable } from 'react-native';
 import Animated, {
   useSharedValue,
@@ -8,7 +8,7 @@ import Animated, {
   interpolateColor,
 } from 'react-native-reanimated';
 import { theme } from '../constants/theme';
-import { hp, wp } from '../helpers/common';
+import { hp } from '../helpers/common';
 
 const FloatingInput = ({
   label,

@@ -54,11 +54,11 @@ const Search = () => {
   useEffect(() => {
     if (searchQuery.length > 0) {
       setLoading(true);
-      const timer = global.setTimeout(() => {
+      const timer = setTimeout(() => {
         setResults(mockResults);
         setLoading(false);
       }, 500);
-      return () => global.clearTimeout(timer);
+      return () => clearTimeout(timer);
     } else {
       setResults(null);
     }

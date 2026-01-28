@@ -39,11 +39,11 @@ const Friends = () => {
   const [friends, setFriends] = useState([]);
 
   useEffect(() => {
-    const timer = global.setTimeout(() => {
+    const timer = setTimeout(() => {
       setFriends(mockFriends);
       setLoading(false);
     }, 1000);
-    return () => global.clearTimeout(timer);
+    return () => clearTimeout(timer);
   }, []);
 
   const filteredFriends = friends.filter((friend) =>

@@ -22,22 +22,22 @@ export const timingConfig = {
   easing: Easing.bezier(0.25, 0.1, 0.25, 1),
 };
 
-export const fadeIn = (value, duration = theme.animation.normal) => {
+export const fadeIn = (duration = theme.animation.normal) => {
   'worklet';
   return withTiming(1, { duration, easing: Easing.ease });
 };
 
-export const fadeOut = (value, duration = theme.animation.normal) => {
+export const fadeOut = (duration = theme.animation.normal) => {
   'worklet';
   return withTiming(0, { duration, easing: Easing.ease });
 };
 
-export const slideUp = (value, toValue = 0, duration = theme.animation.normal) => {
+export const slideUp = (toValue = 0, duration = theme.animation.normal) => {
   'worklet';
   return withTiming(toValue, { duration, easing: Easing.out(Easing.cubic) });
 };
 
-export const slideDown = (value, toValue = 100, duration = theme.animation.normal) => {
+export const slideDown = (toValue = 100, duration = theme.animation.normal) => {
   'worklet';
   return withTiming(toValue, { duration, easing: Easing.out(Easing.cubic) });
 };
@@ -47,7 +47,7 @@ export const scalePress = (isPressed) => {
   return withSpring(isPressed ? 0.95 : 1, springConfig);
 };
 
-export const pulse = (value) => {
+export const pulse = () => {
   'worklet';
   return withRepeat(
     withSequence(
@@ -59,7 +59,7 @@ export const pulse = (value) => {
   );
 };
 
-export const shimmer = (value, duration = 1500) => {
+export const shimmer = (duration = 1500) => {
   'worklet';
   return withRepeat(
     withTiming(1, { duration, easing: Easing.linear }),
