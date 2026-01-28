@@ -1,29 +1,39 @@
-import { View, Text, Button, Image } from "react-native";
 import React, { useEffect } from "react";
-import { useRouter, usePathname, useSegments } from "expo-router";
-import ScreenWrapper from "../components/ScreenWrapper";
+import { View, ActivityIndicator, StyleSheet } from "react-native";
+import { useRouter } from "expo-router";
+import { LinearGradient } from 'expo-linear-gradient';
+import { theme } from "../constants/theme";
 
-const index = () => {
+const Index = () => {
   const router = useRouter();
-  const pathname = usePathname();
-  const segments = useSegments();
 
   useEffect(() => {
-    // console.log("[index] pathname:", pathname);
-    // console.log("[index] segments:", segments);
-  }, [pathname, segments]);
+    const timer = global.setTimeout(() => {
+      router.replace("/welcome");
+    }, 500);
+    return () => global.clearTimeout(timer);
+  }, [router]);
 
   return (
-    <ScreenWrapper>
-      <Text>index</Text>
-
-      {/* quick diagnostics */}
-      <Text>pathname: {pathname}</Text>
-      <Text>segments: {JSON.stringify(segments)}</Text>
-
-      <Button title="welcome" onPress={() => router.push("/welcome")} />
-    </ScreenWrapper>
+    <View style={styles.container}>
+      <LinearGradient
+        colors={theme.colors.gradient.auth}
+        style={styles.gradient}
+      />
+      <ActivityIndicator size="large" color={theme.colors.primary} />
+    </View>
   );
 }
 
-export default index
+const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  gradient: {
+    ...StyleSheet.absoluteFillObject,
+  },
+});
+
+export default Index;
