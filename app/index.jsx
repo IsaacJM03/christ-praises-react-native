@@ -1,17 +1,28 @@
-import { View, Text, Button, Image } from "react-native";
-import React, { useEffect } from "react";
-import { useRouter, usePathname, useSegments } from "expo-router";
-import ScreenWrapper from "../components/ScreenWrapper";
+import React, { useEffect, useState } from "react";
+import { View, StyleSheet, Text } from "react-native";
+import { useRouter } from "expo-router";
+import { LinearGradient } from 'expo-linear-gradient';
+import Animated, { FadeIn } from 'react-native-reanimated';
+import { theme } from "../constants/theme";
+import { hp } from "../helpers/common";
+import InteractiveLogo from "../components/InteractiveLogo";
 
-const index = () => {
+const Index = () => {
   const router = useRouter();
-  const pathname = usePathname();
-  const segments = useSegments();
+  const [animationComplete, setAnimationComplete] = useState(false);
 
   useEffect(() => {
-    // console.log("[index] pathname:", pathname);
-    // console.log("[index] segments:", segments);
-  }, [pathname, segments]);
+    if (animationComplete) {
+      const timer = setTimeout(() => {
+        router.replace("/welcome");
+      }, 800);
+      return () => clearTimeout(timer);
+    }
+  }, [animationComplete, router]);
+
+  const handleAnimationComplete = () => {
+    setAnimationComplete(true);
+  };
 
   return (
     <View style={styles.container}>
@@ -32,11 +43,42 @@ const index = () => {
           style={styles.textContainer}
         >
           <Text style={styles.title}>Christ Praises</Text>
-          <Text style={styles.subtitle}>Can I Testify?</Text>
+          <Text style={styles.subtitle}>Connect • Share • Grow</Text>
         </Animated.View>
       </View>
     </View>
   );
 }
 
-export default index
+const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  gradient: {
+    ...StyleSheet.absoluteFillObject,
+  },
+  content: {
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  textContainer: {
+    alignItems: 'center',
+    marginTop: hp(3),
+  },
+  title: {
+    fontSize: hp(3.5),
+    fontWeight: theme.fonts.bold,
+    color: theme.colors.textLight,
+    letterSpacing: 1,
+  },
+  subtitle: {
+    fontSize: hp(1.6),
+    color: theme.colors.primaryLight,
+    marginTop: theme.spacing.xs,
+    letterSpacing: 2,
+  },
+});
+
+export default Index;
