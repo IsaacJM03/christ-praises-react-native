@@ -31,7 +31,7 @@ const Welcome = () => {
 
         <Animated.View entering={FadeInDown.delay(400).duration(600)} style={styles.textContainer}>
           <Text style={styles.title}>Christ Praises</Text>
-          <Text style={styles.subtitle}>Connect • Share • Grow in Faith</Text>
+          <Text style={styles.subtitle}>Can I Testify? </Text>
           <Text style={styles.punchline}>
             Join a community of believers sharing their journey, lifting each other up, and celebrating God's grace together.
           </Text>

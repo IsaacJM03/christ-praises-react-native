@@ -9,39 +9,27 @@ import {
   KeyboardAvoidingView,
   Platform,
   Dimensions,
+  Alert,
 } from 'react-native';
 import Animated, {
   useSharedValue,
   useAnimatedStyle,
   withSpring,
   withTiming,
-  runOnJS,
-  interpolate,
-  Extrapolate,
 } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { theme } from '../constants/theme';
 import { hp, wp } from '../helpers/common';
 import Icon from '../assets/icons';
 import AnimatedButton from './AnimatedButton';
+import { postService } from '../lib/postService';
 
 const { height: SCREEN_HEIGHT } = Dimensions.get('window');
 
-/**
- * Quick Post Composer Modal
- * 
- * A lightweight bottom sheet for creating quick posts.
- * Features smooth animated entrance/exit.
- * 
- * Props:
- * - visible: boolean
- * - onClose: callback
- * - onSubmit: (content: string) => void
- */
 const QuickPostModal = ({
   visible,
   onClose,
-  onSubmit,
+  onPostCreated, // Add callback prop instead
 }) => {
   const { bottom } = useSafeAreaInsets();
   const [content, setContent] = useState('');
@@ -63,7 +51,6 @@ const QuickPostModal = ({
       backdropOpacity.value = withTiming(1, { duration: 300 });
       sheetScale.value = withSpring(1, { damping: 18, stiffness: 250 });
       
-      // Focus input after animation
       setTimeout(() => {
         inputRef.current?.focus();
       }, 300);
@@ -95,14 +82,17 @@ const QuickPostModal = ({
     
     setIsSubmitting(true);
     try {
-      await onSubmit?.(content.trim());
-      setContent('');
-      handleClose();
-    } catch (error) {
-      // Silent fail for demo - in production, show error toast
-      if (__DEV__) {
-        console.error('Failed to submit post:', error);
+      const result = await postService.createPost(content.trim());
+      
+      if (result.success) {
+        setContent('');
+        onPostCreated?.(result.data); // Notify parent of new post
+        handleClose();
+      } else {
+        Alert.alert('Error', result.message || 'Failed to create post');
       }
+    } catch (error) {
+      Alert.alert('Error', 'Something went wrong. Please try again.');
     } finally {
       setIsSubmitting(false);
     }
@@ -126,22 +116,18 @@ const QuickPostModal = ({
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
         style={styles.container}
       >
-        {/* Backdrop */}
         <Animated.View style={[styles.backdrop, backdropStyle]}>
           <Pressable style={StyleSheet.absoluteFill} onPress={handleClose} />
         </Animated.View>
 
-        {/* Bottom Sheet */}
-        <Animated.View style={[styles.sheet, sheetStyle, { paddingBottom: bottom + 16 }]}>
-          {/* Handle */}
+        <Animated.View style={[styles.sheet, sheetStyle, { paddingBottom: Math.max(bottom, 16) }]}>
           <View style={styles.handleContainer}>
             <View style={styles.handle} />
           </View>
 
-          {/* Header */}
           <View style={styles.header}>
             <Pressable onPress={handleClose} style={styles.closeButton}>
-              <Icon name="arrowLeft" size={22} color={theme.colors.textMuted} />
+              <Icon name="arrowLeft" size={20} color={theme.colors.textMuted} />
             </Pressable>
             <Text style={styles.headerTitle}>Quick Post</Text>
             <View style={styles.headerRight}>
@@ -155,7 +141,6 @@ const QuickPostModal = ({
             </View>
           </View>
 
-          {/* Input Area */}
           <View style={styles.inputContainer}>
             <TextInput
               ref={inputRef}
@@ -163,40 +148,35 @@ const QuickPostModal = ({
               placeholder="Share what's on your heart..."
               placeholderTextColor={theme.colors.grayMedium}
               multiline
-              maxLength={maxCharacters + 10} // Small buffer for smoother UX
+              maxLength={maxCharacters + 10}
               value={content}
               onChangeText={setContent}
-              textAlignVertical="top"
             />
           </View>
 
-          {/* Quick Actions */}
           <View style={styles.quickActions}>
             <View style={styles.actionButtons}>
               <Pressable style={styles.actionButton}>
-                <Icon name="image" size={22} color={theme.colors.primary} />
+                <Icon name="image" size={20} color={theme.colors.primary} />
               </Pressable>
               <Pressable style={styles.actionButton}>
-                <Icon name="camera" size={22} color={theme.colors.primary} />
+                <Icon name="camera" size={20} color={theme.colors.primary} />
               </Pressable>
               <Pressable style={styles.actionButton}>
-                <Icon name="heart" size={22} color={theme.colors.primary} />
+                <Icon name="heart" size={20} color={theme.colors.primary} />
               </Pressable>
             </View>
           </View>
 
-          {/* Submit Button */}
           <View style={styles.submitContainer}>
             <AnimatedButton
               title="Share"
               onPress={handleSubmit}
               loading={isSubmitting}
               disabled={!content.trim() || isOverLimit}
-              icon={<Icon name="send" size={18} color="white" />}
             />
           </View>
 
-          {/* Inspirational hint */}
           <View style={styles.hintContainer}>
             <Text style={styles.hintText}>
               "Let your light shine before others" - Matthew 5:16
@@ -219,48 +199,49 @@ const styles = StyleSheet.create({
   },
   sheet: {
     backgroundColor: theme.colors.card,
-    borderTopLeftRadius: theme.radius.xxl,
-    borderTopRightRadius: theme.radius.xxl,
-    paddingHorizontal: theme.spacing.md,
-    minHeight: hp(45),
+    borderTopLeftRadius: theme.radius.xl,
+    borderTopRightRadius: theme.radius.xl,
+    paddingHorizontal: wp(5),
+    maxHeight: hp(60),
     ...theme.shadow.lg,
   },
   handleContainer: {
     alignItems: 'center',
-    paddingVertical: theme.spacing.sm,
+    paddingTop: theme.spacing.sm,
+    paddingBottom: theme.spacing.xs,
   },
   handle: {
-    width: 40,
+    width: 36,
     height: 4,
     borderRadius: 2,
     backgroundColor: theme.colors.grayMedium,
-    opacity: 0.5,
+    opacity: 0.4,
   },
   header: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingVertical: theme.spacing.sm,
-    borderBottomWidth: 1,
-    borderBottomColor: theme.colors.backgroundSecondary,
+    paddingVertical: theme.spacing.xs,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: theme.colors.grayLight,
   },
   closeButton: {
-    width: 40,
-    height: 40,
+    width: 36,
+    height: 36,
     alignItems: 'center',
     justifyContent: 'center',
   },
   headerTitle: {
-    fontSize: hp(2),
+    fontSize: hp(1.9),
     fontWeight: theme.fonts.semibold,
     color: theme.colors.textDark,
   },
   headerRight: {
-    width: 40,
+    width: 36,
     alignItems: 'center',
   },
   characterCount: {
-    fontSize: hp(1.5),
+    fontSize: hp(1.4),
     color: theme.colors.textMuted,
     fontWeight: theme.fonts.medium,
   },
@@ -271,48 +252,50 @@ const styles = StyleSheet.create({
     color: theme.colors.error,
   },
   inputContainer: {
-    paddingVertical: theme.spacing.md,
-    minHeight: hp(15),
+    paddingTop: theme.spacing.md,
+    paddingBottom: theme.spacing.sm,
+    minHeight: hp(18),
   },
   input: {
-    fontSize: hp(1.9),
+    fontSize: hp(1.8),
     color: theme.colors.text,
-    lineHeight: hp(2.8),
-    minHeight: hp(12),
-    maxHeight: hp(25),
+    lineHeight: hp(2.6),
+    minHeight: hp(15),
+    textAlignVertical: 'top',
   },
   quickActions: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-between',
     paddingVertical: theme.spacing.sm,
-    borderTopWidth: 1,
-    borderTopColor: theme.colors.backgroundSecondary,
+    borderTopWidth: StyleSheet.hairlineWidth,
+    borderTopColor: theme.colors.grayLight,
   },
   actionButtons: {
     flexDirection: 'row',
-    gap: theme.spacing.xs,
+    gap: theme.spacing.sm,
   },
   actionButton: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
+    width: 40,
+    height: 40,
+    borderRadius: 20,
     backgroundColor: theme.colors.backgroundSecondary,
     alignItems: 'center',
     justifyContent: 'center',
   },
   submitContainer: {
-    paddingVertical: theme.spacing.md,
+    paddingVertical: theme.spacing.sm,
   },
   hintContainer: {
     alignItems: 'center',
+    paddingTop: theme.spacing.xs,
     paddingBottom: theme.spacing.sm,
   },
   hintText: {
-    fontSize: hp(1.3),
+    fontSize: hp(1.2),
     color: theme.colors.textMuted,
     fontStyle: 'italic',
     textAlign: 'center',
+    opacity: 0.7,
   },
 });
 

@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { StyleSheet, View, TextInput, Text, Pressable } from 'react-native';
 import Animated, {
   useSharedValue,
@@ -22,11 +22,22 @@ const FloatingInput = ({
   error,
   style,
   inputRef,
+  onFocus,
+  onBlur,
   ...props
 }) => {
   const [isFocused, setIsFocused] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const animatedValue = useSharedValue(value ? 1 : 0);
+
+  // Keep label floated when there's a value
+  useEffect(() => {
+    if (value && animatedValue.value === 0) {
+      animatedValue.value = withTiming(1, { duration: 200 });
+    } else if (!value && !isFocused && animatedValue.value === 1) {
+      animatedValue.value = withTiming(0, { duration: 200 });
+    }
+  }, [value, isFocused]);
 
   const labelStyle = useAnimatedStyle(() => {
     const translateY = interpolate(animatedValue.value, [0, 1], [0, -22]);
@@ -55,6 +66,7 @@ const FloatingInput = ({
   const handleFocus = () => {
     setIsFocused(true);
     animatedValue.value = withTiming(1, { duration: 200 });
+    onFocus?.();
   };
 
   const handleBlur = () => {
@@ -62,6 +74,7 @@ const FloatingInput = ({
     if (!value) {
       animatedValue.value = withTiming(0, { duration: 200 });
     }
+    onBlur?.();
   };
 
   return (

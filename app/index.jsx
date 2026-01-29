@@ -43,7 +43,7 @@ const Index = () => {
           style={styles.textContainer}
         >
           <Text style={styles.title}>Christ Praises</Text>
-          <Text style={styles.subtitle}>Connect • Share • Grow</Text>
+          <Text style={styles.subtitle}>Can I Testify?</Text>
         </Animated.View>
       </View>
     </View>
