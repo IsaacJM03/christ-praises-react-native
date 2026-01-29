@@ -21,11 +21,7 @@ const postController = {
   async createPost(req, res) {
     try {
       const { content, image_url, visibility = 'public' } = req.body;
-      const user_id = sanitizeId(req.user.id);
-
-      if (!user_id) {
-        return res.status(401).json({ success: false, message: 'Invalid user' });
-      }
+      const user_id = req.user.id;
 
       if (!content || typeof content !== 'string' || content.trim().length === 0) {
         return res.status(400).json({ success: false, message: 'Post content is required' });
@@ -36,36 +32,40 @@ const postController = {
         return res.status(400).json({ success: false, message: 'Post content exceeds 280 characters' });
       }
 
-      // Validate visibility
-      const safeVisibility = ALLOWED_VISIBILITY.includes(visibility) ? visibility : 'public';
-
-      // Validate image_url if provided (basic URL validation)
-      let safeImageUrl = null;
-      if (image_url && typeof image_url === 'string') {
-        try {
-          new URL(image_url);
-          safeImageUrl = image_url.substring(0, 500); // Limit length
-        } catch {
-          // Invalid URL, ignore
-        }
-      }
-
+      // Insert the post
       const [result] = await db.execute(
         'INSERT INTO posts (user_id, content, image_url, visibility) VALUES (?, ?, ?, ?)',
-        [user_id, trimmedContent, safeImageUrl, safeVisibility]
+        [user_id, trimmedContent, image_url || null, visibility]
       );
 
+      const postId = result.insertId;
+
+      // Fetch the created post with user info (simpler query)
       const [posts] = await db.execute(
-        `SELECT p.*, u.name as user_name, u.image as user_image,
-                (SELECT COUNT(*) FROM post_likes WHERE post_id = p.id) as likes_count,
-                (SELECT COUNT(*) FROM post_comments WHERE post_id = p.id AND deleted_at IS NULL) as comments_count,
-                (SELECT COUNT(*) > 0 FROM post_likes WHERE post_id = p.id AND user_id = ?) as is_liked,
-                (SELECT COUNT(*) > 0 FROM post_bookmarks WHERE post_id = p.id AND user_id = ?) as is_bookmarked
+        `SELECT 
+          p.id,
+          p.user_id,
+          p.content,
+          p.image_url,
+          p.visibility,
+          p.is_pinned,
+          p.created_at,
+          p.updated_at,
+          u.name as user_name,
+          u.image as user_image,
+          0 as likes_count,
+          0 as comments_count,
+          0 as is_liked,
+          0 as is_bookmarked
          FROM posts p
          JOIN users u ON p.user_id = u.id
          WHERE p.id = ?`,
-        [result.insertId]
+        [postId]
       );
+
+      if (posts.length === 0) {
+        return res.status(500).json({ success: false, message: 'Failed to retrieve created post' });
+      }
 
       res.status(201).json({
         success: true,
@@ -78,41 +78,73 @@ const postController = {
     }
   },
 
-  // Get feed posts (paginated)
+  // Get feed posts (paginated) - simplified query
   async getFeed(req, res) {
     try {
-      const user_id = sanitizeId(req.user.id);
-      if (!user_id) {
-        return res.status(401).json({ success: false, message: 'Invalid user' });
-      }
-
-      const { page, limit } = sanitizePagination(req.query.page, req.query.limit);
+      const user_id = req.user.id;
+      const page = Math.max(1, parseInt(req.query.page) || 1);
+      const limit = Math.min(50, Math.max(1, parseInt(req.query.limit) || 20));
       const offset = (page - 1) * limit;
 
+      // Simpler query without subqueries for counts
       const [posts] = await db.execute(
-        `SELECT p.*, u.name as user_name, u.image as user_image,
-                (SELECT COUNT(*) FROM post_likes WHERE post_id = p.id) as likes_count,
-                (SELECT COUNT(*) FROM post_comments WHERE post_id = p.id AND deleted_at IS NULL) as comments_count,
-                (SELECT COUNT(*) > 0 FROM post_likes WHERE post_id = p.id AND user_id = ?) as is_liked,
-                (SELECT COUNT(*) > 0 FROM post_bookmarks WHERE post_id = p.id AND user_id = ?) as is_bookmarked
+        `SELECT 
+          p.id,
+          p.user_id,
+          p.content,
+          p.image_url,
+          p.visibility,
+          p.is_pinned,
+          p.created_at,
+          p.updated_at,
+          u.name as user_name,
+          u.image as user_image
          FROM posts p
          JOIN users u ON p.user_id = u.id
          WHERE p.deleted_at IS NULL AND p.visibility = 'public'
          ORDER BY p.is_pinned DESC, p.created_at DESC
          LIMIT ? OFFSET ?`,
-        [user_id, user_id, limit, offset]
+        [String(limit), String(offset)]
       );
 
-      const [countResult] = await db.execute(
+      // Get counts separately for each post (more reliable)
+      const postsWithCounts = await Promise.all(posts.map(async (post) => {
+        const [[likesResult]] = await db.execute(
+          'SELECT COUNT(*) as count FROM post_likes WHERE post_id = ?',
+          [post.id]
+        );
+        const [[commentsResult]] = await db.execute(
+          'SELECT COUNT(*) as count FROM post_comments WHERE post_id = ? AND deleted_at IS NULL',
+          [post.id]
+        );
+        const [[isLikedResult]] = await db.execute(
+          'SELECT COUNT(*) as count FROM post_likes WHERE post_id = ? AND user_id = ?',
+          [post.id, user_id]
+        );
+        const [[isBookmarkedResult]] = await db.execute(
+          'SELECT COUNT(*) as count FROM post_bookmarks WHERE post_id = ? AND user_id = ?',
+          [post.id, user_id]
+        );
+
+        return {
+          ...post,
+          likes_count: likesResult.count,
+          comments_count: commentsResult.count,
+          is_liked: isLikedResult.count > 0,
+          is_bookmarked: isBookmarkedResult.count > 0
+        };
+      }));
+
+      const [[countResult]] = await db.execute(
         'SELECT COUNT(*) as total FROM posts WHERE deleted_at IS NULL AND visibility = "public"'
       );
 
-      const total = countResult[0].total;
+      const total = countResult.total;
       const hasMore = offset + posts.length < total;
 
       res.json({
         success: true,
-        data: posts,
+        data: postsWithCounts,
         pagination: {
           page,
           limit,

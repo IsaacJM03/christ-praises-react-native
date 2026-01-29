@@ -18,20 +18,20 @@ import Animated, {
   withTiming,
 } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { Ionicons } from '@expo/vector-icons';
 import { theme } from '../constants/theme';
 import { hp, wp } from '../helpers/common';
-import Icon from '../assets/icons';
 import AnimatedButton from './AnimatedButton';
-import { postService } from '../lib/postService';
+import { usePosts } from '../contexts/PostContext';
 
 const { height: SCREEN_HEIGHT } = Dimensions.get('window');
 
 const QuickPostModal = ({
   visible,
   onClose,
-  onPostCreated, // Add callback prop instead
 }) => {
   const { bottom } = useSafeAreaInsets();
+  const { createPost } = usePosts();
   const [content, setContent] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const inputRef = useRef(null);
@@ -39,25 +39,22 @@ const QuickPostModal = ({
   // Animation values
   const translateY = useSharedValue(SCREEN_HEIGHT);
   const backdropOpacity = useSharedValue(0);
-  const sheetScale = useSharedValue(0.95);
 
   useEffect(() => {
     if (visible) {
       translateY.value = withSpring(0, {
-        damping: 20,
-        stiffness: 200,
+        damping: 25,
+        stiffness: 300,
         mass: 0.8,
       });
-      backdropOpacity.value = withTiming(1, { duration: 300 });
-      sheetScale.value = withSpring(1, { damping: 18, stiffness: 250 });
+      backdropOpacity.value = withTiming(1, { duration: 250 });
       
       setTimeout(() => {
         inputRef.current?.focus();
-      }, 300);
+      }, 400);
     } else {
-      translateY.value = withTiming(SCREEN_HEIGHT, { duration: 250 });
-      backdropOpacity.value = withTiming(0, { duration: 200 });
-      sheetScale.value = withTiming(0.95, { duration: 200 });
+      translateY.value = withTiming(SCREEN_HEIGHT, { duration: 200 });
+      backdropOpacity.value = withTiming(0, { duration: 150 });
     }
   }, [visible]);
 
@@ -66,10 +63,7 @@ const QuickPostModal = ({
   }));
 
   const sheetStyle = useAnimatedStyle(() => ({
-    transform: [
-      { translateY: translateY.value },
-      { scale: sheetScale.value },
-    ],
+    transform: [{ translateY: translateY.value }],
   }));
 
   const handleClose = () => {
@@ -82,11 +76,10 @@ const QuickPostModal = ({
     
     setIsSubmitting(true);
     try {
-      const result = await postService.createPost(content.trim());
+      const result = await createPost(content.trim());
       
       if (result.success) {
         setContent('');
-        onPostCreated?.(result.data); // Notify parent of new post
         handleClose();
       } else {
         Alert.alert('Error', result.message || 'Failed to create post');
@@ -121,15 +114,17 @@ const QuickPostModal = ({
         </Animated.View>
 
         <Animated.View style={[styles.sheet, sheetStyle, { paddingBottom: Math.max(bottom, 16) }]}>
+          {/* Handle */}
           <View style={styles.handleContainer}>
             <View style={styles.handle} />
           </View>
 
+          {/* Header */}
           <View style={styles.header}>
             <Pressable onPress={handleClose} style={styles.closeButton}>
-              <Icon name="arrowLeft" size={20} color={theme.colors.textMuted} />
+              <Ionicons name="close" size={24} color={theme.colors.textMuted} />
             </Pressable>
-            <Text style={styles.headerTitle}>Quick Post</Text>
+            <Text style={styles.headerTitle}>Create Post</Text>
             <View style={styles.headerRight}>
               <Text style={[
                 styles.characterCount,
@@ -141,46 +136,54 @@ const QuickPostModal = ({
             </View>
           </View>
 
+          {/* Input Area */}
           <View style={styles.inputContainer}>
             <TextInput
               ref={inputRef}
               style={styles.input}
-              placeholder="Share what's on your heart..."
+              placeholder="What's on your mind?"
               placeholderTextColor={theme.colors.grayMedium}
               multiline
               maxLength={maxCharacters + 10}
               value={content}
               onChangeText={setContent}
+              textAlignVertical="top"
             />
           </View>
 
-          <View style={styles.quickActions}>
-            <View style={styles.actionButtons}>
-              <Pressable style={styles.actionButton}>
-                <Icon name="image" size={20} color={theme.colors.primary} />
+          {/* Bottom Actions */}
+          <View style={styles.bottomSection}>
+            {/* Media Actions */}
+            <View style={styles.mediaActions}>
+              <Pressable style={styles.mediaButton}>
+                <Ionicons name="image-outline" size={22} color={theme.colors.primary} />
               </Pressable>
-              <Pressable style={styles.actionButton}>
-                <Icon name="camera" size={20} color={theme.colors.primary} />
+              <Pressable style={styles.mediaButton}>
+                <Ionicons name="camera-outline" size={22} color={theme.colors.primary} />
               </Pressable>
-              <Pressable style={styles.actionButton}>
-                <Icon name="heart" size={20} color={theme.colors.primary} />
+              <Pressable style={styles.mediaButton}>
+                <Ionicons name="location-outline" size={22} color={theme.colors.primary} />
               </Pressable>
             </View>
-          </View>
 
-          <View style={styles.submitContainer}>
-            <AnimatedButton
-              title="Share"
+            {/* Submit Button */}
+            <Pressable 
+              style={[
+                styles.submitButton,
+                (!content.trim() || isOverLimit) && styles.submitButtonDisabled
+              ]}
               onPress={handleSubmit}
-              loading={isSubmitting}
-              disabled={!content.trim() || isOverLimit}
-            />
-          </View>
-
-          <View style={styles.hintContainer}>
-            <Text style={styles.hintText}>
-              "Let your light shine before others" - Matthew 5:16
-            </Text>
+              disabled={!content.trim() || isOverLimit || isSubmitting}
+            >
+              {isSubmitting ? (
+                <Text style={styles.submitButtonText}>Posting...</Text>
+              ) : (
+                <>
+                  <Text style={styles.submitButtonText}>Post</Text>
+                  <Ionicons name="send" size={16} color="white" style={{ marginLeft: 6 }} />
+                </>
+              )}
+            </Pressable>
           </View>
         </Animated.View>
       </KeyboardAvoidingView>
@@ -199,49 +202,50 @@ const styles = StyleSheet.create({
   },
   sheet: {
     backgroundColor: theme.colors.card,
-    borderTopLeftRadius: theme.radius.xl,
-    borderTopRightRadius: theme.radius.xl,
-    paddingHorizontal: wp(5),
-    maxHeight: hp(60),
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
+    paddingHorizontal: wp(4),
     ...theme.shadow.lg,
   },
   handleContainer: {
     alignItems: 'center',
-    paddingTop: theme.spacing.sm,
-    paddingBottom: theme.spacing.xs,
+    paddingTop: 12,
+    paddingBottom: 8,
   },
   handle: {
-    width: 36,
+    width: 40,
     height: 4,
     borderRadius: 2,
     backgroundColor: theme.colors.grayMedium,
-    opacity: 0.4,
+    opacity: 0.3,
   },
   header: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingVertical: theme.spacing.xs,
+    paddingVertical: 12,
     borderBottomWidth: StyleSheet.hairlineWidth,
     borderBottomColor: theme.colors.grayLight,
   },
   closeButton: {
-    width: 36,
-    height: 36,
+    width: 40,
+    height: 40,
     alignItems: 'center',
     justifyContent: 'center',
+    borderRadius: 20,
+    backgroundColor: theme.colors.backgroundSecondary,
   },
   headerTitle: {
-    fontSize: hp(1.9),
-    fontWeight: theme.fonts.semibold,
+    fontSize: hp(2),
+    fontWeight: theme.fonts.bold,
     color: theme.colors.textDark,
   },
   headerRight: {
-    width: 36,
+    width: 40,
     alignItems: 'center',
   },
   characterCount: {
-    fontSize: hp(1.4),
+    fontSize: hp(1.5),
     color: theme.colors.textMuted,
     fontWeight: theme.fonts.medium,
   },
@@ -252,50 +256,53 @@ const styles = StyleSheet.create({
     color: theme.colors.error,
   },
   inputContainer: {
-    paddingTop: theme.spacing.md,
-    paddingBottom: theme.spacing.sm,
-    minHeight: hp(18),
+    minHeight: hp(20),
+    maxHeight: hp(35),
+    paddingVertical: 16,
   },
   input: {
-    fontSize: hp(1.8),
+    fontSize: hp(1.9),
     color: theme.colors.text,
-    lineHeight: hp(2.6),
-    minHeight: hp(15),
-    textAlignVertical: 'top',
+    lineHeight: hp(2.8),
+    minHeight: hp(18),
   },
-  quickActions: {
+  bottomSection: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingVertical: theme.spacing.sm,
+    justifyContent: 'space-between',
+    paddingVertical: 16,
     borderTopWidth: StyleSheet.hairlineWidth,
     borderTopColor: theme.colors.grayLight,
   },
-  actionButtons: {
+  mediaActions: {
     flexDirection: 'row',
-    gap: theme.spacing.sm,
+    gap: 8,
   },
-  actionButton: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
+  mediaButton: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
     backgroundColor: theme.colors.backgroundSecondary,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  submitContainer: {
-    paddingVertical: theme.spacing.sm,
-  },
-  hintContainer: {
+  submitButton: {
+    flexDirection: 'row',
     alignItems: 'center',
-    paddingTop: theme.spacing.xs,
-    paddingBottom: theme.spacing.sm,
+    justifyContent: 'center',
+    backgroundColor: theme.colors.primary,
+    paddingHorizontal: 24,
+    paddingVertical: 12,
+    borderRadius: 24,
   },
-  hintText: {
-    fontSize: hp(1.2),
-    color: theme.colors.textMuted,
-    fontStyle: 'italic',
-    textAlign: 'center',
-    opacity: 0.7,
+  submitButtonDisabled: {
+    backgroundColor: theme.colors.grayMedium,
+    opacity: 0.6,
+  },
+  submitButtonText: {
+    color: 'white',
+    fontSize: hp(1.7),
+    fontWeight: theme.fonts.semibold,
   },
 });
 
