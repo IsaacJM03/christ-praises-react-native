@@ -391,15 +391,7 @@ const HomeContent = () => {
   const [showProfile, setShowProfile] = useState(false);
   const [user, setUser] = useState(null);
 
-  // Mock stories data
-  const stories = [
-    { id: '1', name: 'Sarah M.', image: null },
-    { id: '2', name: 'David K.', image: null },
-    { id: '3', name: 'Grace L.', image: null },
-    { id: '4', name: 'Paul W.', image: null },
-    { id: '5', name: 'Ruth A.', image: null },
-  ];
-
+  // Load user from storage
   useEffect(() => {
     const loadUser = async () => {
       const userData = await authService.getUser();
@@ -408,16 +400,21 @@ const HomeContent = () => {
     loadUser();
   }, []);
 
+  const stories = [
+    { id: '1', name: 'Sarah M.', image: null },
+    { id: '2', name: 'David K.', image: null },
+    { id: '3', name: 'Grace L.', image: null },
+    { id: '4', name: 'Paul W.', image: null },
+    { id: '5', name: 'Ruth A.', image: null },
+  ];
+
   const handleCommentPress = (postId) => console.log('Open comments for post:', postId);
   const handleUserPress = (userId) => console.log('Open profile for user:', userId);
   const handleOptionsPress = (post) => console.log('Show options for post:', post.id);
 
   const ListHeader = () => (
     <>
-      {/* Welcome Card */}
       <WelcomeCard user={user} />
-
-      {/* Stories Section */}
       <Animated.View entering={FadeInDown.delay(300).duration(500)}>
         <SectionHeader title="Stories" onSeeAll={() => {}} />
         <ScrollView 
@@ -433,8 +430,6 @@ const HomeContent = () => {
           ))}
         </ScrollView>
       </Animated.View>
-
-      {/* Feed Header */}
       <SectionHeader title="Recent Posts" />
     </>
   );
@@ -443,7 +438,6 @@ const HomeContent = () => {
     <View style={styles.container}>
       <StatusBar style="dark" />
       
-      {/* Header */}
       <Animated.View 
         entering={FadeIn.duration(500)} 
         style={[styles.header, { paddingTop: top + hp(0.5) }]}
@@ -470,7 +464,6 @@ const HomeContent = () => {
         </View>
       </Animated.View>
 
-      {/* Feed with Header */}
       <PostFeed
         onCommentPress={handleCommentPress}
         onUserPress={handleUserPress}
@@ -478,10 +471,8 @@ const HomeContent = () => {
         ListHeaderComponent={ListHeader}
       />
 
-      {/* FAB */}
       <FloatingActionButton onPress={() => setShowPostModal(true)} />
 
-      {/* Modals */}
       <QuickPostModal visible={showPostModal} onClose={() => setShowPostModal(false)} />
       <NotificationsPopup visible={showNotifications} onClose={() => setShowNotifications(false)} />
       <ProfilePopup visible={showProfile} onClose={() => setShowProfile(false)} user={user} />
