@@ -38,36 +38,76 @@ const SignUp = () => {
   }
   
   return (
-    <ScreenWrapper bg="white">
-      <StatusBar style='dark' />
-      <View style={styles.container}>
-        <BackButton router={router}/>
+    <View style={styles.container}>
+      <StatusBar style='light' />
+      <LinearGradient
+        colors={theme.colors.gradient.auth}
+        style={styles.gradient}
+      />
+      
+      <KeyboardAvoidingView 
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        style={styles.keyboardView}
+      >
+        <ScrollView 
+          showsVerticalScrollIndicator={false}
+          contentContainerStyle={styles.scrollContent}
+        >
+          <View style={styles.content}>
+            <Animated.View entering={FadeInUp.delay(100)}>
+              <BackButton router={router}/>
+            </Animated.View>
 
-        {/* welcome */}
-        <View>
-          <Text style={styles.welcomeText}>Let's</Text>
-          <Text style={styles.welcomeText}>Begin!</Text>
-        </View>
+            <Animated.View entering={FadeInDown.delay(150)} style={styles.logoContainer}>
+              <InteractiveLogo 
+                mode="onboarding"
+                size={hp(12)}
+                motionIntensity={0.6}
+                isFocused={inputFocused}
+              />
+            </Animated.View>
 
-        {/* form */}
-        <View style={styles.form}>
-          <Text style={{fontSize: hp(1.8), color: theme.colors.text}}>Please fill in your details to create an account</Text>
-          <Input 
-            icon={<Icon name='user' size={26}  strokeWidth={1.6} color={theme.colors.text} />}
-            placeholder='Enter your name'
-            onChangeText={value=> nameRef.current = value}
-          />
-          <Input 
-            icon={<Icon name='mail' size={26}  strokeWidth={1.6} color={theme.colors.text} />}
-            placeholder='Enter your e-mail'
-            onChangeText={value=> emailRef.current = value}
-          />
-          <Input 
-            icon={<Icon name='lock' size={26}  strokeWidth={1.6} color={theme.colors.text} />}
-            placeholder='Enter your password'
-            secureTextEntry
-            onChangeText={value=> passwordRef.current = value}
-          />
+            <Animated.View entering={FadeInDown.delay(200)} style={styles.header}>
+              <Text style={styles.welcomeText}>Let's</Text>
+              <Text style={styles.welcomeText}>Get Started!</Text>
+              <Text style={styles.subtitleText}>Create your account to join the community</Text>
+            </Animated.View>
+
+            <Animated.View entering={FadeInDown.delay(300)} style={styles.form}>
+              <FloatingInput 
+                label="Full Name"
+                icon={<Icon name='user' size={22} strokeWidth={1.6} color={theme.colors.grayMedium} />}
+                placeholder='Enter your full name'
+                value={name}
+                onChangeText={setName}
+                autoCapitalize="words"
+                error={errors.name}
+                onFocus={() => setInputFocused(true)}
+                onBlur={() => setTimeout(() => setInputFocused(false), 100)}
+              />
+              <FloatingInput 
+                label="Email"
+                icon={<Icon name='mail' size={22} strokeWidth={1.6} color={theme.colors.grayMedium} />}
+                placeholder='Enter your email'
+                value={email}
+                onChangeText={setEmail}
+                keyboardType="email-address"
+                autoCapitalize="none"
+                error={errors.email}
+                onFocus={() => setInputFocused(true)}
+                onBlur={() => setTimeout(() => setInputFocused(false), 100)}
+              />
+              <FloatingInput 
+                label="Password"
+                icon={<Icon name='lock' size={22} strokeWidth={1.6} color={theme.colors.grayMedium} />}
+                placeholder='Create a password'
+                value={password}
+                onChangeText={setPassword}
+                secureTextEntry
+                error={errors.password}
+                onFocus={() => setInputFocused(true)}
+                onBlur={() => setTimeout(() => setInputFocused(false), 100)}
+              />
 
           {/* button */}
           <Button 

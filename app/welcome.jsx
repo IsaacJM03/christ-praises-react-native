@@ -10,35 +10,51 @@ import { useRouter } from 'expo-router'
 const Welcome = () => {
   const router = useRouter();
   return (
-    <ScreenWrapper>
-      <StatusBar style='dark' />
-      <View style={styles.container}>
-          {/*welcome image*/}
-          <Image style={styles.welcomeImage} resizeMode='contain' source={require('../assets/images/welcome2.png')} />
+    <View style={styles.container}>
+      <StatusBar style='light' />
+      <LinearGradient
+        colors={['#1a1a2e', '#0f0f23', '#16213e']}
+        style={styles.gradient}
+      />
+      
+      <View style={styles.content}>
+        <Animated.View entering={FadeInUp.delay(200).duration(600)} style={styles.logoContainer}>
+          <InteractiveLogo 
+            mode="onboarding"
+            size={hp(24)}
+            motionIntensity={1}
+          />
+        </Animated.View>
 
-          {/*title*/}
-          <View style={{gap: 20}}>
-            <Text style={styles.title}>Christ Praises</Text>
-            <Text style={styles.punchline}>Lorem ipsum dolor sit amet, consectetur adipiscing elit. Donec auctor, turpis nec aliquam.</Text>
-          </View>
+        <Animated.View entering={FadeInDown.delay(400).duration(600)} style={styles.textContainer}>
+          <Text style={styles.title}>Christ Praises</Text>
+          <Text style={styles.subtitle}>Can I Testify?</Text>
+          <Text style={styles.punchline}>
+            Join a community of believers sharing their journey, lifting each other up, and celebrating God's grace together.
+          </Text>
+        </Animated.View>
 
-          {/*footer*/}
-          <View style={styles.footer}>
-            <Button 
-                title="Getting Started"
-                buttonStyle={{marginHorizontal: wp(3)}}
-                onPress={()=>router.push('signUp')}
-            />
+        <Animated.View entering={FadeInDown.delay(600).duration(600)} style={styles.footer}>
+          <AnimatedButton 
+            title="Get Started"
+            onPress={() => router.push('signUp')}
+          />
+          
+          <AnimatedButton 
+            title="I already have an account"
+            variant="ghost"
+            onPress={() => router.push('login')}
+            style={styles.secondaryButton}
+            textStyle={styles.secondaryButtonText}
+          />
+        </Animated.View>
 
-            <View style={styles.bottomTextContainer}>
-              <Text style={styles.loginText}>Already have an account?
-              </Text>
-
-              <Pressable onPress={()=>router.push('login')}>
-                <Text style={[styles.loginText, {color: theme.colors.primaryDark, fontWeight:theme.fonts.semibold}]}>Login</Text>
-              </Pressable>
-            </View>
-          </View>
+        <Animated.View entering={FadeInDown.delay(800).duration(600)} style={styles.inspirationContainer}>
+          <Text style={styles.inspirationText}>
+            "For where two or three gather in my name, there am I with them."
+          </Text>
+          <Text style={styles.verseReference}>Matthew 18:20</Text>
+        </Animated.View>
       </View>
     </ScreenWrapper>
   )

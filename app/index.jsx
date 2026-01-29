@@ -14,15 +14,28 @@ const index = () => {
   }, [pathname, segments]);
 
   return (
-    <ScreenWrapper>
-      <Text>index</Text>
-
-      {/* quick diagnostics */}
-      <Text>pathname: {pathname}</Text>
-      <Text>segments: {JSON.stringify(segments)}</Text>
-
-      <Button title="welcome" onPress={() => router.push("/welcome")} />
-    </ScreenWrapper>
+    <View style={styles.container}>
+      <LinearGradient
+        colors={theme.colors.gradient.auth}
+        style={styles.gradient}
+      />
+      
+      <View style={styles.content}>
+        <InteractiveLogo 
+          mode="splash"
+          size={hp(25)}
+          onAnimationComplete={handleAnimationComplete}
+        />
+        
+        <Animated.View 
+          entering={FadeIn.delay(600).duration(400)}
+          style={styles.textContainer}
+        >
+          <Text style={styles.title}>Christ Praises</Text>
+          <Text style={styles.subtitle}>Can I Testify?</Text>
+        </Animated.View>
+      </View>
+    </View>
   );
 }
 

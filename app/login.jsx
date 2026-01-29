@@ -40,48 +40,83 @@ const Login = () => {
   }
   
   return (
-    <ScreenWrapper bg="white">
-      <StatusBar style='dark' />
-      <View style={styles.container}>
-        <BackButton router={router}/>
+    <View style={styles.container}>
+      <StatusBar style='light' />
+      <LinearGradient
+        colors={theme.colors.gradient.auth}
+        style={styles.gradient}
+      />
+      
+      <KeyboardAvoidingView 
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        style={styles.keyboardView}
+      >
+        <View style={styles.content}>
+          <Animated.View entering={FadeInUp.delay(100)}>
+            <BackButton router={router}/>
+          </Animated.View>
 
-        {/* welcome */}
-        <View>
-          <Text style={styles.welcomeText}>Hey,</Text>
-          <Text style={styles.welcomeText}>Welcome Back!</Text>
-        </View>
+          <Animated.View entering={FadeInDown.delay(150)} style={styles.logoContainer}>
+            <InteractiveLogo 
+              mode="onboarding"
+              size={hp(12)}
+              motionIntensity={0.6}
+              isFocused={inputFocused}
+            />
+          </Animated.View>
 
-        {/* form */}
-        <View style={styles.form}>
-          <Text style={{fontSize: hp(1.8), color: theme.colors.text}}>Please login to continue</Text>
-          <Input 
-            icon={<Icon name='mail' size={26}  strokeWidth={1.6} color={theme.colors.text} />}
-            placeholder='Enter your E-mail'
-            onChangeText={value=> emailRef.current = value}
-          />
-          <Input 
-            icon={<Icon name='lock' size={26}  strokeWidth={1.6} color={theme.colors.text} />}
-            placeholder='Enter your password'
-            secureTextEntry
-            onChangeText={value=> passwordRef.current = value}
-          />
-          <Text style={styles.forgotPassword}>
-           Forgot Password?
-           </Text>
+          <Animated.View entering={FadeInDown.delay(200)} style={styles.header}>
+            <Text style={styles.welcomeText}>Hey,</Text>
+            <Text style={styles.welcomeText}>Welcome Back!</Text>
+            <Text style={styles.subtitleText}>Sign in to continue your journey</Text>
+          </Animated.View>
 
-          {/* button */}
-          <Button 
-            title={'Login'}
-            onPress={onSubmit}
-            loading={loading}
-          />
-        </View>
-        {/* footer */}
-        <View style={styles.footer}>
-          <Text style={styles.footerText}>Don't have an account?</Text>
-          <Pressable onPress={() => router.push('/signUp')}>
-            <Text style={[styles.footerText, {color: theme.colors.primaryDark, fontWeight:theme.fonts.semibold}]}>Sign Up</Text>
-          </Pressable>
+          <Animated.View entering={FadeInDown.delay(300)} style={styles.form}>
+            <FloatingInput 
+              label="Email"
+              icon={<Icon name='mail' size={22} strokeWidth={1.6} color={theme.colors.grayMedium} />}
+              placeholder='Enter your email'
+              value={email}
+              onChangeText={setEmail}
+              keyboardType="email-address"
+              autoCapitalize="none"
+              error={errors.email}
+              onFocus={() => setInputFocused(true)}
+              onBlur={() => setTimeout(() => setInputFocused(false), 100)}
+            />
+            <FloatingInput 
+              label="Password"
+              icon={<Icon name='lock' size={22} strokeWidth={1.6} color={theme.colors.grayMedium} />}
+              placeholder='Enter your password'
+              value={password}
+              onChangeText={setPassword}
+              secureTextEntry
+              error={errors.password}
+              onFocus={() => setInputFocused(true)}
+              onBlur={() => setTimeout(() => setInputFocused(false), 100)}
+            />
+            
+            <Pressable style={styles.forgotPassword}>
+              <Text style={styles.forgotPasswordText}>Forgot Password?</Text>
+            </Pressable>
+
+            <AnimatedButton 
+              title="Login"
+              onPress={onSubmit}
+              loading={loading}
+            />
+          </Animated.View>
+
+          <Animated.View entering={FadeInDown.delay(400)} style={styles.footer}>
+            <Text style={styles.footerText}>Don't have an account?</Text>
+            <Pressable onPress={() => router.push('/signUp')}>
+              <Text style={styles.footerLink}>Sign Up</Text>
+            </Pressable>
+          </Animated.View>
+
+          <Animated.View entering={FadeInDown.delay(500)} style={styles.inspirationContainer}>
+            <Text style={styles.inspirationText}>"Faith is taking the first step even when you don't see the whole staircase."</Text>
+          </Animated.View>
         </View>
       </View>
     </ScreenWrapper>
