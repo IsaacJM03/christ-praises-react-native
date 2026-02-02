@@ -73,6 +73,7 @@ const PostFeed = ({
   const [activePostId, setActivePostId] = useState(null);
   const [commentText, setCommentText] = useState('');
   const [showComments, setShowComments] = useState(false);
+  const [isExpanded, setIsExpanded] = useState(false); // Track expansion state with React state
   
   // Sheet animation
   const sheetHeight = useSharedValue(MID_SHEET_HEIGHT);
@@ -108,6 +109,7 @@ const PostFeed = ({
   const openComments = useCallback(async (postId) => {
     setActivePostId(postId);
     setShowComments(true);
+    setIsExpanded(false); // Reset expansion state
     sheetTranslateY.value = withSpring(0, { damping: 20, stiffness: 200 });
     sheetHeight.value = MID_SHEET_HEIGHT;
     await fetchComments(postId);
@@ -119,8 +121,19 @@ const PostFeed = ({
       runOnJS(setShowComments)(false);
       runOnJS(setCommentText)('');
       runOnJS(setActivePostId)(null);
+      runOnJS(setIsExpanded)(false);
     });
   }, []);
+
+  // Handle expand/collapse
+  const toggleExpand = useCallback(() => {
+    const newExpanded = !isExpanded;
+    setIsExpanded(newExpanded);
+    sheetHeight.value = withSpring(
+      newExpanded ? MAX_SHEET_HEIGHT : MID_SHEET_HEIGHT,
+      { damping: 20 }
+    );
+  }, [isExpanded]);
 
   // Submit comment
   const submitComment = async () => {
@@ -137,12 +150,15 @@ const PostFeed = ({
       closeComments();
     } else if (translationY < -100) {
       // Expand to max
+      setIsExpanded(true);
       sheetHeight.value = withSpring(MAX_SHEET_HEIGHT, { damping: 20 });
     } else if (translationY > 50) {
       // Shrink to min
+      setIsExpanded(false);
       sheetHeight.value = withSpring(MIN_SHEET_HEIGHT, { damping: 20 });
     } else {
       // Return to mid
+      setIsExpanded(false);
       sheetHeight.value = withSpring(MID_SHEET_HEIGHT, { damping: 20 });
     }
   }, [closeComments]);
@@ -290,14 +306,9 @@ const PostFeed = ({
             <View style={styles.commentsHeader}>
               <Text style={styles.commentsTitle}>Comments</Text>
               <View style={styles.headerActions}>
-                <Pressable onPress={() => {
-                  sheetHeight.value = withSpring(
-                    sheetHeight.value === MAX_SHEET_HEIGHT ? MID_SHEET_HEIGHT : MAX_SHEET_HEIGHT,
-                    { damping: 20 }
-                  );
-                }} style={styles.expandButton}>
+                <Pressable onPress={toggleExpand} style={styles.expandButton}>
                   <Ionicons 
-                    name={sheetHeight.value === MAX_SHEET_HEIGHT ? "chevron-down" : "chevron-up"} 
+                    name={isExpanded ? "chevron-down" : "chevron-up"} 
                     size={24} 
                     color={theme.colors.textMuted} 
                   />

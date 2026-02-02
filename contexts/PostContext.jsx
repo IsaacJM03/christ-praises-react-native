@@ -379,14 +379,14 @@ export const PostProvider = ({ children }) => {
           return updated;
         });
         
-        // Also update in repliesByComment (if it's a nested reply)
+        // Also update replies_count in repliesByComment (if it's a nested reply)
         setRepliesByComment(prev => {
           const updated = { ...prev };
           for (const pId in updated) {
-            if (pId !== String(commentId)) { // Don't modify the one we just added to
+            if (pId !== String(commentId)) {
               updated[pId] = (updated[pId] || []).map(reply => 
                 reply.id === commentId
-                  ? { ...reply, replies_count: (reply.replies_count || 0) + 1 }
+                  ? { ...reply, replies_count: normalizedReplies.length }
                   : reply
               );
             }
@@ -394,12 +394,7 @@ export const PostProvider = ({ children }) => {
           return updated;
         });
         
-        // Increment total comment count on the post
-        setPosts(prev => prev.map(p => (
-          p.id === postId
-            ? { ...p, comments_count: (p.comments_count || 0) + 1 }
-            : p
-        )));
+        // DO NOT increment comments_count here - fetching is just viewing, not adding
       }
       return result;
     } catch (err) {
@@ -448,7 +443,7 @@ export const PostProvider = ({ children }) => {
         setRepliesByComment(prev => {
           const updated = { ...prev };
           for (const pId in updated) {
-            if (pId !== String(parentCommentId)) { // Don't modify the one we just added to
+            if (pId !== String(parentCommentId)) {
               updated[pId] = (updated[pId] || []).map(reply => 
                 reply.id === parentCommentId
                   ? { ...reply, replies_count: (reply.replies_count || 0) + 1 }
