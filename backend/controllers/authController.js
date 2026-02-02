@@ -1,77 +1,53 @@
 const db = require('../config/database');
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
-require('dotenv').config();
 
 const authController = {
-  // Register new user
+  // Register
   async register(req, res) {
     try {
       const { name, email, password } = req.body;
 
-      // Validation
-      if (!name || !email || !password) {
-        return res.status(400).json({ 
-          success: false, 
-          message: 'Name, email, and password are required' 
-        });
-      }
-
-      if (password.length < 6) {
-        return res.status(400).json({ 
-          success: false, 
-          message: 'Password must be at least 6 characters' 
-        });
+      if (!email || !password) {
+        return res.status(400).json({ success: false, message: 'Email and password are required' });
       }
 
       // Check if user exists
-      const [existingUsers] = await db.execute(
+      const [existing] = await db.execute(
         'SELECT id FROM users WHERE email = ?',
-        [email.toLowerCase()]
+        [email]
       );
 
-      if (existingUsers.length > 0) {
-        return res.status(400).json({ 
-          success: false, 
-          message: 'Email already registered' 
-        });
+      if (existing.length > 0) {
+        return res.status(400).json({ success: false, message: 'Email already registered' });
       }
 
       // Hash password
-      const saltRounds = 10;
-      const hashedPassword = await bcrypt.hash(password, saltRounds);
+      const hashedPassword = await bcrypt.hash(password, 10);
 
       // Create user
       const [result] = await db.execute(
         'INSERT INTO users (name, email, password) VALUES (?, ?, ?)',
-        [name.trim(), email.toLowerCase().trim(), hashedPassword]
+        [name || email.split('@')[0], email, hashedPassword]
       );
 
-      const userId = result.insertId;
-
-      // Generate JWT token
+      // Generate token
       const token = jwt.sign(
-        { 
-          id: userId, 
-          email: email.toLowerCase(),
-          name: name.trim()
-        },
-        process.env.JWT_SECRET,
-        { expiresIn: '7d' } // Token expires in 7 days
-      );
-
-      // Get user data (without password)
-      const [users] = await db.execute(
-        'SELECT id, name, email, image, created_at FROM users WHERE id = ?',
-        [userId]
+        { id: result.insertId, email },
+        process.env.JWT_SECRET || 'your-secret-key',
+        { expiresIn: '30d' }
       );
 
       res.status(201).json({
         success: true,
-        message: 'Account created successfully',
         data: {
-          user: users[0],
-          token
+          token,
+          user: {
+            id: result.insertId,
+            name: name || email.split('@')[0],
+            email,
+            image: null
+          }
         }
       });
     } catch (error) {
@@ -80,64 +56,51 @@ const authController = {
     }
   },
 
-  // Login user
+  // Login
   async login(req, res) {
     try {
       const { email, password } = req.body;
 
-      // Validation
       if (!email || !password) {
-        return res.status(400).json({ 
-          success: false, 
-          message: 'Email and password are required' 
-        });
+        return res.status(400).json({ success: false, message: 'Email and password are required' });
       }
 
       // Find user
       const [users] = await db.execute(
         'SELECT * FROM users WHERE email = ?',
-        [email.toLowerCase()]
+        [email]
       );
 
       if (users.length === 0) {
-        return res.status(401).json({ 
-          success: false, 
-          message: 'Invalid email or password' 
-        });
+        return res.status(401).json({ success: false, message: 'Invalid email or password' });
       }
 
       const user = users[0];
 
-      // Verify password
+      // Check password
       const isValidPassword = await bcrypt.compare(password, user.password);
-
       if (!isValidPassword) {
-        return res.status(401).json({ 
-          success: false, 
-          message: 'Invalid email or password' 
-        });
+        return res.status(401).json({ success: false, message: 'Invalid email or password' });
       }
 
-      // Generate JWT token
+      // Generate token
       const token = jwt.sign(
-        { 
-          id: user.id, 
-          email: user.email,
-          name: user.name
-        },
-        process.env.JWT_SECRET,
-        { expiresIn: '7d' }
+        { id: user.id, email: user.email },
+        process.env.JWT_SECRET || 'your-secret-key',
+        { expiresIn: '30d' }
       );
-
-      // Remove password from response
-      const { password: _, ...userWithoutPassword } = user;
 
       res.json({
         success: true,
-        message: 'Login successful',
         data: {
-          user: userWithoutPassword,
-          token
+          token,
+          user: {
+            id: user.id,
+            name: user.name,
+            email: user.email,
+            image: user.image,
+            bio: user.bio
+          }
         }
       });
     } catch (error) {
@@ -147,10 +110,10 @@ const authController = {
   },
 
   // Get current user
-  async me(req, res) {
+  async getCurrentUser(req, res) {
     try {
       const [users] = await db.execute(
-        'SELECT id, name, email, image, bio, created_at FROM users WHERE id = ?',
+        'SELECT id, name, email, bio, image, created_at FROM users WHERE id = ?',
         [req.user.id]
       );
 
@@ -160,10 +123,63 @@ const authController = {
 
       res.json({ success: true, data: users[0] });
     } catch (error) {
-      console.error('Get me error:', error);
+      console.error('Get current user error:', error);
       res.status(500).json({ success: false, message: 'Failed to get user' });
     }
-  }
+  },
+
+  // Update profile
+  async updateProfile(req, res) {
+    try {
+      const user_id = req.user.id;
+      const { name, bio, image } = req.body;
+
+      console.log('Updating profile for user:', user_id, { name, bio, image: image ? 'provided' : 'not provided' });
+
+      const updates = [];
+      const values = [];
+
+      if (name !== undefined) {
+        updates.push('name = ?');
+        values.push(name);
+      }
+      if (bio !== undefined) {
+        updates.push('bio = ?');
+        values.push(bio);
+      }
+      if (image !== undefined) {
+        updates.push('image = ?');
+        values.push(image);
+      }
+
+      if (updates.length === 0) {
+        return res.status(400).json({ success: false, message: 'No fields to update' });
+      }
+
+      values.push(user_id);
+
+      await db.execute(
+        `UPDATE users SET ${updates.join(', ')} WHERE id = ?`,
+        values
+      );
+
+      // Fetch updated user
+      const [users] = await db.execute(
+        'SELECT id, name, email, bio, image, created_at FROM users WHERE id = ?',
+        [user_id]
+      );
+
+      if (users.length === 0) {
+        return res.status(404).json({ success: false, message: 'User not found' });
+      }
+
+      console.log('Profile updated successfully:', users[0]);
+      res.json({ success: true, data: users[0] });
+    } catch (error) {
+      console.error('Update profile error:', error);
+      res.status(500).json({ success: false, message: 'Failed to update profile' });
+    }
+  },
 };
 
 module.exports = authController;

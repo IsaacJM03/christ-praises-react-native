@@ -68,12 +68,14 @@ export default function TabLayout() {
           ),
         }}
       />
-      {/* Hide friends tab if it exists */}
+      {/* Hidden screens - accessible via navigation but not shown in tab bar */}
+      <Tabs.Screen
+        name="liked"
+        options={{ href: null }}
+      />
       <Tabs.Screen
         name="friends"
-        options={{
-          href: null, // This hides the tab
-        }}
+        options={{ href: null }}
       />
     </Tabs>
   );

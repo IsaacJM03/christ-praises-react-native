@@ -1,5 +1,5 @@
-import React, { useState, useEffect } from 'react';
-import { StyleSheet, View, Text, Pressable, Image, ScrollView, Alert } from 'react-native';
+import React, { useState, useEffect, useCallback } from 'react';
+import { StyleSheet, View, Text, Pressable, Image, ScrollView, Alert, RefreshControl } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -14,14 +14,31 @@ const ProfileScreen = () => {
   const { top, bottom } = useSafeAreaInsets();
   const router = useRouter();
   const [user, setUser] = useState(null);
+  const [refreshing, setRefreshing] = useState(false);
+  const [stats, setStats] = useState({ posts: 0, followers: 0, following: 0 });
+
+  const loadUser = useCallback(async () => {
+    const userData = await authService.getUser();
+    console.log('User data:', userData);
+    setUser(userData);
+    
+    // TODO: Fetch actual stats from API
+    // For now, using placeholder
+  }, []);
 
   useEffect(() => {
-    const loadUser = async () => {
-      const userData = await authService.getUser();
-      setUser(userData);
-    };
     loadUser();
   }, []);
+
+  const onRefresh = async () => {
+    setRefreshing(true);
+    // Refresh user data from server
+    const result = await authService.getCurrentUser();
+    if (result.success) {
+      setUser(result.data);
+    }
+    setRefreshing(false);
+  };
 
   const handleLogout = async () => {
     Alert.alert(
@@ -41,14 +58,42 @@ const ProfileScreen = () => {
     );
   };
 
+  const handleEditProfile = () => {
+    Alert.alert('Coming Soon', 'Profile editing will be available soon!');
+  };
+
+  const handleLikedPosts = () => {
+    Alert.alert('Coming Soon', 'Liked posts will be available soon!');
+  };
+
+  const handleSettings = () => {
+    Alert.alert('Coming Soon', 'Settings will be available soon!');
+  };
+
+  const handleHelp = () => {
+    Alert.alert('Help & Support', 'For assistance, please email support@christpraises.app');
+  };
+
+  const handleAbout = () => {
+    Alert.alert(
+      'About Christ Praises',
+      'Christ Praises is a community app for sharing faith, encouragement, and inspiration.\n\nVersion 1.0.0\n\n© 2024 Christ Praises'
+    );
+  };
+
   const menuItems = [
-    { icon: 'person-outline', label: 'Edit Profile', onPress: () => {} },
+    { icon: 'person-outline', label: 'Edit Profile', onPress: () => router.push('/editProfile') },
     { icon: 'bookmark-outline', label: 'Saved Posts', onPress: () => router.push('/(tabs)/saved') },
-    { icon: 'heart-outline', label: 'Liked Posts', onPress: () => {} },
-    { icon: 'settings-outline', label: 'Settings', onPress: () => {} },
-    { icon: 'help-circle-outline', label: 'Help & Support', onPress: () => {} },
-    { icon: 'information-circle-outline', label: 'About', onPress: () => {} },
+    { icon: 'heart-outline', label: 'Liked Posts', onPress: () => router.push('/(tabs)/liked') },
+    { icon: 'settings-outline', label: 'Settings', onPress: handleSettings },
+    { icon: 'help-circle-outline', label: 'Help & Support', onPress: handleHelp },
+    { icon: 'information-circle-outline', label: 'About', onPress: handleAbout },
   ];
+
+  // Get display name - prioritize name over email
+  const displayName = user?.name || user?.email?.split('@')[0] || 'User';
+  const displayEmail = user?.email || '';
+  const avatarLetter = (user?.name || user?.email || 'U').charAt(0).toUpperCase();
 
   return (
     <View style={styles.container}>
@@ -63,27 +108,25 @@ const ProfileScreen = () => {
             <Image source={{ uri: user.image }} style={styles.avatar} />
           ) : (
             <View style={styles.avatarPlaceholder}>
-              <Text style={styles.avatarText}>
-                {user?.name?.charAt(0)?.toUpperCase() || '?'}
-              </Text>
+              <Text style={styles.avatarText}>{avatarLetter}</Text>
             </View>
           )}
-          <Text style={styles.userName}>{user?.name || 'User'}</Text>
-          <Text style={styles.userEmail}>{user?.email || ''}</Text>
+          <Text style={styles.userName}>{displayName}</Text>
+          <Text style={styles.userEmail}>{displayEmail}</Text>
           
           <View style={styles.statsRow}>
             <View style={styles.statItem}>
-              <Text style={styles.statNumber}>0</Text>
+              <Text style={styles.statNumber}>{stats.posts}</Text>
               <Text style={styles.statLabel}>Posts</Text>
             </View>
             <View style={styles.statDivider} />
             <View style={styles.statItem}>
-              <Text style={styles.statNumber}>0</Text>
+              <Text style={styles.statNumber}>{stats.followers}</Text>
               <Text style={styles.statLabel}>Followers</Text>
             </View>
             <View style={styles.statDivider} />
             <View style={styles.statItem}>
-              <Text style={styles.statNumber}>0</Text>
+              <Text style={styles.statNumber}>{stats.following}</Text>
               <Text style={styles.statLabel}>Following</Text>
             </View>
           </View>
@@ -94,6 +137,14 @@ const ProfileScreen = () => {
         style={styles.content}
         contentContainerStyle={{ paddingBottom: bottom + hp(2) }}
         showsVerticalScrollIndicator={false}
+        refreshControl={
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={onRefresh}
+            tintColor={theme.colors.primary}
+            colors={[theme.colors.primary]}
+          />
+        }
       >
         <View style={styles.menuSection}>
           {menuItems.map((item, index) => (
@@ -101,7 +152,13 @@ const ProfileScreen = () => {
               key={item.label}
               entering={FadeInDown.delay(index * 50).duration(400)}
             >
-              <Pressable style={styles.menuItem} onPress={item.onPress}>
+              <Pressable 
+                style={({ pressed }) => [
+                  styles.menuItem,
+                  pressed && styles.menuItemPressed
+                ]}
+                onPress={item.onPress}
+              >
                 <View style={styles.menuIconContainer}>
                   <Ionicons name={item.icon} size={22} color={theme.colors.primary} />
                 </View>
@@ -113,7 +170,13 @@ const ProfileScreen = () => {
         </View>
 
         <Animated.View entering={FadeInDown.delay(300).duration(400)}>
-          <Pressable style={styles.logoutButton} onPress={handleLogout}>
+          <Pressable 
+            style={({ pressed }) => [
+              styles.logoutButton,
+              pressed && styles.logoutButtonPressed
+            ]}
+            onPress={handleLogout}
+          >
             <Ionicons name="log-out-outline" size={22} color={theme.colors.rose} />
             <Text style={styles.logoutText}>Log Out</Text>
           </Pressable>
@@ -221,6 +284,9 @@ const styles = StyleSheet.create({
     borderBottomWidth: StyleSheet.hairlineWidth,
     borderBottomColor: theme.colors.grayLight,
   },
+  menuItemPressed: {
+    backgroundColor: theme.colors.backgroundSecondary,
+  },
   menuIconContainer: {
     width: 40,
     height: 40,
@@ -246,6 +312,9 @@ const styles = StyleSheet.create({
     backgroundColor: theme.colors.roseLight,
     borderRadius: theme.radius.xl,
     gap: theme.spacing.sm,
+  },
+  logoutButtonPressed: {
+    opacity: 0.8,
   },
   logoutText: {
     fontSize: hp(1.7),

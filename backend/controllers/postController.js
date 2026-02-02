@@ -604,6 +604,60 @@ const postController = {
       console.error('Get bookmarked posts error:', error);
       res.status(500).json({ success: false, message: 'Failed to fetch bookmarked posts' });
     }
+  },
+
+  // Get liked posts for current user
+  async getLikedPosts(req, res) {
+    try {
+      const user_id = req.user.id;
+      const page = parseInt(req.query.page) || 1;
+      const limit = parseInt(req.query.limit) || 20;
+      const offset = (page - 1) * limit;
+
+      console.log('Fetching liked posts for user:', user_id);
+
+      const [posts] = await db.query(
+        `SELECT p.*, u.name as user_name, u.image as user_image
+         FROM posts p
+         JOIN users u ON p.user_id = u.id
+         JOIN post_likes l ON p.id = l.post_id
+         WHERE l.user_id = ? AND p.deleted_at IS NULL
+         ORDER BY l.created_at DESC
+         LIMIT ${limit} OFFSET ${offset}`,
+        [user_id]
+      );
+
+      console.log('Found liked posts:', posts.length);
+
+      // Add counts for each post
+      const postsWithCounts = await Promise.all(posts.map(async (post) => {
+        const [[likesResult]] = await db.execute(
+          'SELECT COUNT(*) as count FROM post_likes WHERE post_id = ?',
+          [post.id]
+        );
+        const [[commentsResult]] = await db.execute(
+          'SELECT COUNT(*) as count FROM post_comments WHERE post_id = ? AND deleted_at IS NULL',
+          [post.id]
+        );
+        const [[isBookmarkedResult]] = await db.execute(
+          'SELECT COUNT(*) as count FROM post_bookmarks WHERE post_id = ? AND user_id = ?',
+          [post.id, user_id]
+        );
+
+        return {
+          ...post,
+          likes_count: likesResult.count,
+          comments_count: commentsResult.count,
+          is_liked: true, // Obviously liked since we're fetching from likes
+          is_bookmarked: isBookmarkedResult.count > 0,
+        };
+      }));
+
+      res.json({ success: true, data: postsWithCounts });
+    } catch (error) {
+      console.error('Get liked posts error:', error);
+      res.status(500).json({ success: false, message: 'Failed to fetch liked posts' });
+    }
   }
 };
 

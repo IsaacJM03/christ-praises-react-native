@@ -8,6 +8,7 @@ router.post('/register', authController.register);
 router.post('/login', authController.login);
 
 // Protected routes
-router.get('/me', authMiddleware, authController.me);
+router.get('/me', authMiddleware, authController.getCurrentUser);
+router.put('/profile', authMiddleware, authController.updateProfile);
 
 module.exports = router;

@@ -8,6 +8,7 @@ router.use(authMiddleware);
 
 // IMPORTANT: Put specific routes BEFORE parameterized routes
 router.get('/bookmarked', postController.getBookmarkedPosts);
+router.get('/liked', postController.getLikedPosts);
 router.get('/feed', postController.getFeed);
 
 // Parameterized routes

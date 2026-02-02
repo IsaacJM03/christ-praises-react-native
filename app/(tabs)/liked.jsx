@@ -39,7 +39,7 @@ const { height: SCREEN_HEIGHT } = Dimensions.get('window');
 const MAX_SHEET_HEIGHT = SCREEN_HEIGHT * 0.9;
 const MID_SHEET_HEIGHT = SCREEN_HEIGHT * 0.6;
 
-const SavedScreen = () => {
+const LikedScreen = () => {
   const insets = useSafeAreaInsets();
   const router = useRouter();
   
@@ -62,20 +62,20 @@ const SavedScreen = () => {
   const sheetHeight = useSharedValue(MID_SHEET_HEIGHT);
   const sheetTranslateY = useSharedValue(SCREEN_HEIGHT);
 
-  const fetchSavedPosts = useCallback(async (isRefresh = false) => {
+  const fetchLikedPosts = useCallback(async (isRefresh = false) => {
     try {
       if (isRefresh) setRefreshing(true);
       else setLoading(true);
       setError(null);
 
-      const result = await postService.getBookmarkedPosts(1, 50);
+      const result = await postService.getLikedPosts(1, 50);
       if (result.success) {
         setPosts(result.data || []);
       } else {
-        setError(result.message || 'Failed to load saved posts');
+        setError(result.message || 'Failed to load liked posts');
       }
     } catch (err) {
-      setError('Failed to load saved posts');
+      setError('Failed to load liked posts');
     } finally {
       setLoading(false);
       setRefreshing(false);
@@ -83,24 +83,23 @@ const SavedScreen = () => {
   }, []);
 
   useEffect(() => {
-    fetchSavedPosts();
+    fetchLikedPosts();
   }, []);
 
-  const handleRefresh = () => fetchSavedPosts(true);
+  const handleRefresh = () => fetchLikedPosts(true);
 
   const handleToggleLike = useCallback(async (postId) => {
-    setPosts(prev => prev.map(post => {
-      if (post.id === postId) {
-        const newIsLiked = !post.is_liked;
-        return { ...post, is_liked: newIsLiked, likes_count: newIsLiked ? (post.likes_count || 0) + 1 : Math.max(0, (post.likes_count || 0) - 1) };
-      }
-      return post;
-    }));
+    setPosts(prev => prev.filter(post => post.id !== postId));
     await postService.toggleLike(postId);
   }, []);
 
   const handleToggleBookmark = useCallback(async (postId) => {
-    setPosts(prev => prev.filter(post => post.id !== postId));
+    setPosts(prev => prev.map(post => {
+      if (post.id === postId) {
+        return { ...post, is_bookmarked: !post.is_bookmarked };
+      }
+      return post;
+    }));
     await postService.toggleBookmark(postId);
   }, []);
 
@@ -108,7 +107,9 @@ const SavedScreen = () => {
     const post = posts.find(p => p.id === postId);
     if (!post) return;
     try {
-      await Share.share({ message: `${post.content}\n\n— ${post.user_name || 'Christ Praises'}` });
+      await Share.share({
+        message: `${post.content}\n\n— ${post.user_name || 'Christ Praises'}`,
+      });
     } catch (err) {}
   }, [posts]);
 
@@ -159,8 +160,13 @@ const SavedScreen = () => {
     if (!activePostId || !commentText.trim()) return;
     const result = await postService.addComment(activePostId, commentText.trim());
     if (result.success && result.data) {
-      setCommentsByPost(prev => ({ ...prev, [activePostId]: [result.data, ...(prev[activePostId] || [])] }));
-      setPosts(prev => prev.map(p => p.id === activePostId ? { ...p, comments_count: (p.comments_count || 0) + 1 } : p));
+      setCommentsByPost(prev => ({
+        ...prev,
+        [activePostId]: [result.data, ...(prev[activePostId] || [])],
+      }));
+      setPosts(prev => prev.map(p => 
+        p.id === activePostId ? { ...p, comments_count: (p.comments_count || 0) + 1 } : p
+      ));
       setCommentText('');
     }
   };
@@ -218,9 +224,19 @@ const SavedScreen = () => {
     const result = await postService.addComment(postId, content, parentCommentId);
     if (result.success && result.data) {
       const normalized = { ...result.data, is_liked: false, likes_count: 0, replies_count: 0 };
-      setRepliesByComment(prev => ({ ...prev, [parentCommentId]: [...(prev[parentCommentId] || []), normalized] }));
-      setCommentsByPost(prev => ({ ...prev, [postId]: (prev[postId] || []).map(c => c.id === parentCommentId ? { ...c, replies_count: (c.replies_count || 0) + 1 } : c) }));
-      setPosts(prev => prev.map(p => p.id === postId ? { ...p, comments_count: (p.comments_count || 0) + 1 } : p));
+      setRepliesByComment(prev => ({
+        ...prev,
+        [parentCommentId]: [...(prev[parentCommentId] || []), normalized],
+      }));
+      setCommentsByPost(prev => ({
+        ...prev,
+        [postId]: (prev[postId] || []).map(c => 
+          c.id === parentCommentId ? { ...c, replies_count: (c.replies_count || 0) + 1 } : c
+        )
+      }));
+      setPosts(prev => prev.map(p => 
+        p.id === postId ? { ...p, comments_count: (p.comments_count || 0) + 1 } : p
+      ));
     }
     return result;
   }, []);
@@ -261,10 +277,10 @@ const SavedScreen = () => {
   const renderEmpty = () => (
     <Animated.View entering={FadeIn.duration(500)} style={styles.emptyContainer}>
       <View style={styles.emptyIconContainer}>
-        <Ionicons name="bookmark-outline" size={80} color={theme.colors.grayMedium} />
+        <Ionicons name="heart-outline" size={80} color={theme.colors.grayMedium} />
       </View>
-      <Text style={styles.emptyTitle}>No saved posts yet</Text>
-      <Text style={styles.emptySubtitle}>Tap the bookmark icon on any post to save it.</Text>
+      <Text style={styles.emptyTitle}>No liked posts yet</Text>
+      <Text style={styles.emptySubtitle}>Posts you like will appear here.</Text>
       <Pressable style={styles.exploreButton} onPress={() => router.push('/(tabs)')}>
         <Ionicons name="compass-outline" size={20} color="white" />
         <Text style={styles.exploreButtonText}>Explore Posts</Text>
@@ -277,7 +293,10 @@ const SavedScreen = () => {
       <StatusBar style="dark" />
       
       <Animated.View entering={FadeIn.duration(500)} style={[styles.header, { paddingTop: insets.top + hp(0.5) }]}>
-        <Text style={styles.headerTitle}>Saved Posts</Text>
+        <Pressable style={styles.backButton} onPress={() => router.push('/(tabs)/profile')}>
+          <Ionicons name="arrow-back" size={24} color={theme.colors.textDark} />
+        </Pressable>
+        <Text style={styles.headerTitle}>Liked Posts</Text>
         <Pressable style={styles.headerButton} onPress={handleRefresh}>
           <Ionicons name="refresh-outline" size={24} color={theme.colors.textDark} />
         </Pressable>
@@ -290,7 +309,7 @@ const SavedScreen = () => {
           <Ionicons name="cloud-offline-outline" size={64} color={theme.colors.grayMedium} />
           <Text style={styles.errorTitle}>Oops!</Text>
           <Text style={styles.errorText}>{error}</Text>
-          <Pressable style={styles.retryButton} onPress={() => fetchSavedPosts()}>
+          <Pressable style={styles.retryButton} onPress={() => fetchLikedPosts()}>
             <Text style={styles.retryButtonText}>Try Again</Text>
           </Pressable>
         </View>
@@ -298,12 +317,12 @@ const SavedScreen = () => {
         <FlatList
           data={posts}
           renderItem={renderPost}
-          keyExtractor={(item) => `saved-${item.id}`}
+          keyExtractor={(item) => `liked-${item.id}`}
           contentContainerStyle={styles.listContent}
           showsVerticalScrollIndicator={false}
           refreshControl={<RefreshControl refreshing={refreshing} onRefresh={handleRefresh} colors={[theme.colors.primary]} tintColor={theme.colors.primary} />}
           ListEmptyComponent={renderEmpty}
-          ListHeaderComponent={posts.length > 0 ? <View style={styles.listHeader}><Text style={styles.savedCount}>{posts.length} posts saved</Text></View> : null}
+          ListHeaderComponent={posts.length > 0 ? <View style={styles.listHeader}><Text style={styles.likedCount}>{posts.length} posts liked</Text></View> : null}
         />
       )}
 
@@ -367,16 +386,17 @@ const SavedScreen = () => {
   );
 };
 
-export default SavedScreen;
+export default LikedScreen;
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: theme.colors.background },
   header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: wp(4), paddingBottom: hp(1), backgroundColor: theme.colors.card, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: theme.colors.grayLight },
-  headerTitle: { fontSize: hp(2.4), fontWeight: theme.fonts.bold, color: theme.colors.textDark },
+  backButton: { padding: theme.spacing.xs, borderRadius: theme.radius.full, width: 42, height: 42, alignItems: 'center', justifyContent: 'center' },
+  headerTitle: { fontSize: hp(2), fontWeight: theme.fonts.bold, color: theme.colors.textDark },
   headerButton: { padding: theme.spacing.xs, borderRadius: theme.radius.full, backgroundColor: theme.colors.backgroundSecondary, width: 42, height: 42, alignItems: 'center', justifyContent: 'center' },
   listContent: { paddingBottom: hp(10), flexGrow: 1 },
   listHeader: { paddingHorizontal: wp(4), paddingVertical: theme.spacing.md },
-  savedCount: { fontSize: hp(1.6), color: theme.colors.textMuted, fontWeight: theme.fonts.medium },
+  likedCount: { fontSize: hp(1.6), color: theme.colors.textMuted, fontWeight: theme.fonts.medium },
   emptyContainer: { flex: 1, justifyContent: 'center', alignItems: 'center', paddingHorizontal: wp(10), paddingBottom: hp(10) },
   emptyIconContainer: { width: 120, height: 120, borderRadius: 60, backgroundColor: theme.colors.backgroundSecondary, alignItems: 'center', justifyContent: 'center', marginBottom: theme.spacing.lg },
   emptyTitle: { fontSize: hp(2.4), fontWeight: theme.fonts.bold, color: theme.colors.textDark, marginBottom: theme.spacing.sm },
