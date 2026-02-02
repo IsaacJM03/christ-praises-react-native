@@ -9,7 +9,7 @@ import Animated, {
 } from 'react-native-reanimated';
 import { Ionicons } from '@expo/vector-icons';
 import { theme } from '../constants/theme';
-import { hp, wp } from '../helpers/common';
+import { hp } from '../helpers/common';
 
 const AnimatedPressable = Animated.createAnimatedComponent(Pressable);
 
@@ -19,12 +19,11 @@ const CommentItem = ({
   onLike,
   onReply,
   onLoadReplies,
-  onLikeReply,
   replies = [],
   repliesLoading = false,
   isReply = false,
   depth = 0,
-  allReplies = {}, // Pass all replies data for nested access
+  allReplies = {},
   allRepliesLoading = {},
 }) => {
   const [showReplyInput, setShowReplyInput] = useState(false);
@@ -50,16 +49,12 @@ const CommentItem = ({
       withSpring(1.3, { damping: 10 }),
       withSpring(1, { damping: 15 })
     );
-    // Use onLikeReply for nested comments, onLike for top-level
-    if (isReply && onLikeReply) {
-      onLikeReply(postId, comment.id);
-    } else {
-      onLike?.(postId, comment.id);
-    }
+    onLike?.(postId, comment.id);
   };
 
   const handleToggleReplies = async () => {
     if (!showReplies && comment.replies_count > 0) {
+      console.log('Loading replies for comment:', comment.id);
       await onLoadReplies?.(postId, comment.id);
     }
     setShowReplies(!showReplies);
@@ -67,6 +62,7 @@ const CommentItem = ({
 
   const handleSubmitReply = () => {
     if (!replyText.trim()) return;
+    console.log('Submitting reply to:', comment.id);
     onReply?.(postId, comment.id, replyText.trim());
     setReplyText('');
     setShowReplyInput(false);
@@ -77,9 +73,13 @@ const CommentItem = ({
     transform: [{ scale: likeScale.value }],
   }));
 
-  // Calculate visual indentation (max visual indent at depth 4, but unlimited actual depth)
+  // Calculate visual indentation (max visual indent at depth 4)
   const visualDepth = Math.min(depth, 4);
-  const indentWidth = isReply ? Math.min(16, 20 - visualDepth * 2) : 0;
+  const indentWidth = isReply ? Math.max(12, 20 - visualDepth * 2) : 0;
+
+  // Get replies for this comment from allReplies
+  const thisCommentReplies = allReplies[comment.id] || replies || [];
+  const thisCommentRepliesLoading = allRepliesLoading[comment.id] || repliesLoading || false;
 
   return (
     <Animated.View 
@@ -87,7 +87,7 @@ const CommentItem = ({
       style={[
         styles.container,
         isReply && styles.replyContainer,
-        { marginLeft: isReply ? indentWidth : 0 }
+        { marginLeft: indentWidth }
       ]}
     >
       {/* Thread line for nested comments */}
@@ -123,7 +123,7 @@ const CommentItem = ({
                 size={14} 
                 color={comment.is_liked ? theme.colors.rose : theme.colors.textMuted} 
               />
-              {comment.likes_count > 0 && (
+              {(comment.likes_count || 0) > 0 && (
                 <Text style={[
                   styles.actionText,
                   comment.is_liked && { color: theme.colors.rose }
@@ -133,7 +133,7 @@ const CommentItem = ({
               )}
             </AnimatedPressable>
 
-            {/* Always allow replying - unlimited depth */}
+            {/* Always allow replying */}
             <Pressable 
               style={styles.actionButton} 
               onPress={() => setShowReplyInput(!showReplyInput)}
@@ -142,7 +142,7 @@ const CommentItem = ({
               <Text style={styles.actionText}>Reply</Text>
             </Pressable>
 
-            {comment.replies_count > 0 && (
+            {(comment.replies_count || 0) > 0 && (
               <Pressable style={styles.actionButton} onPress={handleToggleReplies}>
                 <Ionicons 
                   name={showReplies ? "chevron-up" : "chevron-down"} 
@@ -150,7 +150,7 @@ const CommentItem = ({
                   color={theme.colors.primary} 
                 />
                 <Text style={[styles.actionText, { color: theme.colors.primary }]}>
-                  {showReplies ? 'Hide' : `${comment.replies_count}`} {comment.replies_count === 1 ? 'reply' : 'replies'}
+                  {showReplies ? 'Hide' : comment.replies_count} {comment.replies_count === 1 ? 'reply' : 'replies'}
                 </Text>
               </Pressable>
             )}
@@ -195,31 +195,32 @@ const CommentItem = ({
             </Animated.View>
           )}
 
-          {/* Nested Replies - recursive unlimited depth */}
+          {/* Nested Replies */}
           {showReplies && (
             <View style={styles.repliesContainer}>
-              {(allRepliesLoading?.[comment.id] || repliesLoading) ? (
+              {thisCommentRepliesLoading ? (
                 <View style={styles.repliesLoading}>
                   <ActivityIndicator size="small" color={theme.colors.primary} />
                 </View>
-              ) : (
-                (allReplies?.[comment.id] || replies).map((reply) => (
+              ) : thisCommentReplies.length > 0 ? (
+                thisCommentReplies.map((reply) => (
                   <CommentItem
-                    key={reply.id}
+                    key={`reply-${reply.id}`}
                     comment={reply}
                     postId={postId}
                     onLike={onLike}
                     onReply={onReply}
                     onLoadReplies={onLoadReplies}
-                    onLikeReply={onLikeReply || onLike}
-                    replies={allReplies?.[reply.id] || []}
-                    repliesLoading={allRepliesLoading?.[reply.id] || false}
+                    replies={allReplies[reply.id] || []}
+                    repliesLoading={allRepliesLoading[reply.id] || false}
                     isReply={true}
                     depth={depth + 1}
                     allReplies={allReplies}
                     allRepliesLoading={allRepliesLoading}
                   />
                 ))
+              ) : (
+                <Text style={styles.noRepliesText}>No replies yet</Text>
               )}
             </View>
           )}
@@ -363,6 +364,12 @@ const styles = StyleSheet.create({
   repliesLoading: {
     paddingVertical: 12,
     alignItems: 'center',
+  },
+  noRepliesText: {
+    fontSize: 12,
+    color: theme.colors.textMuted,
+    fontStyle: 'italic',
+    paddingVertical: 8,
   },
 });
 

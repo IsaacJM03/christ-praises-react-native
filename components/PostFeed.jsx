@@ -10,21 +10,42 @@ import {
   TextInput,
   Pressable,
   Share,
+  KeyboardAvoidingView,
+  Platform,
+  Dimensions,
+  PanResponder,
 } from 'react-native';
-import Animated, { FadeIn, FadeInUp } from 'react-native-reanimated';
+import Animated, { 
+  FadeIn, 
+  FadeInUp,
+  useSharedValue,
+  useAnimatedStyle,
+  withSpring,
+  withTiming,
+  runOnJS,
+} from 'react-native-reanimated';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { Ionicons } from '@expo/vector-icons';
+import { Gesture, GestureDetector, GestureHandlerRootView } from 'react-native-gesture-handler';
 import { theme } from '../constants/theme';
 import { hp, wp } from '../helpers/common';
 import { usePosts } from '../contexts/PostContext';
 import PostCard from './PostCard';
 import { PostSkeletonList } from './PostSkeleton';
-import { Ionicons } from '@expo/vector-icons';
 import CommentItem from './CommentItem';
+
+const { height: SCREEN_HEIGHT } = Dimensions.get('window');
+const MAX_SHEET_HEIGHT = SCREEN_HEIGHT * 0.9;
+const MID_SHEET_HEIGHT = SCREEN_HEIGHT * 0.6;
+const MIN_SHEET_HEIGHT = SCREEN_HEIGHT * 0.4;
 
 const PostFeed = ({ 
   onUserPress, 
   onOptionsPress, 
   ListHeaderComponent 
 }) => {
+  const insets = useSafeAreaInsets();
+  
   const {
     posts,
     loading,
@@ -52,6 +73,10 @@ const PostFeed = ({
   const [activePostId, setActivePostId] = useState(null);
   const [commentText, setCommentText] = useState('');
   const [showComments, setShowComments] = useState(false);
+  
+  // Sheet animation
+  const sheetHeight = useSharedValue(MID_SHEET_HEIGHT);
+  const sheetTranslateY = useSharedValue(SCREEN_HEIGHT);
 
   // Fetch posts on mount
   useEffect(() => {
@@ -72,29 +97,30 @@ const PostFeed = ({
   const handleShare = useCallback(async (postId) => {
     const post = posts.find(p => p.id === postId);
     if (!post) return;
-
     try {
       await Share.share({
         message: `${post.content}\n\n— ${post.user_name || 'Christ Praises'}`,
       });
-    } catch (err) {
-      // silent fail
-    }
+    } catch (err) {}
   }, [posts]);
 
   // Open comments modal
   const openComments = useCallback(async (postId) => {
     setActivePostId(postId);
     setShowComments(true);
+    sheetTranslateY.value = withSpring(0, { damping: 20, stiffness: 200 });
+    sheetHeight.value = MID_SHEET_HEIGHT;
     await fetchComments(postId);
   }, [fetchComments]);
 
   // Close comments modal
-  const closeComments = () => {
-    setShowComments(false);
-    setCommentText('');
-    setActivePostId(null);
-  };
+  const closeComments = useCallback(() => {
+    sheetTranslateY.value = withTiming(SCREEN_HEIGHT, { duration: 250 }, () => {
+      runOnJS(setShowComments)(false);
+      runOnJS(setCommentText)('');
+      runOnJS(setActivePostId)(null);
+    });
+  }, []);
 
   // Submit comment
   const submitComment = async () => {
@@ -104,6 +130,39 @@ const PostFeed = ({
       setCommentText('');
     }
   };
+
+  // Handle sheet drag
+  const onSheetDrag = useCallback((translationY) => {
+    if (translationY > 150) {
+      closeComments();
+    } else if (translationY < -100) {
+      // Expand to max
+      sheetHeight.value = withSpring(MAX_SHEET_HEIGHT, { damping: 20 });
+    } else if (translationY > 50) {
+      // Shrink to min
+      sheetHeight.value = withSpring(MIN_SHEET_HEIGHT, { damping: 20 });
+    } else {
+      // Return to mid
+      sheetHeight.value = withSpring(MID_SHEET_HEIGHT, { damping: 20 });
+    }
+  }, [closeComments]);
+
+  const panResponder = useRef(
+    PanResponder.create({
+      onStartShouldSetPanResponder: () => true,
+      onMoveShouldSetPanResponder: (_, gestureState) => {
+        return Math.abs(gestureState.dy) > 10;
+      },
+      onPanResponderRelease: (_, gestureState) => {
+        onSheetDrag(gestureState.dy);
+      },
+    })
+  ).current;
+
+  const sheetAnimatedStyle = useAnimatedStyle(() => ({
+    height: sheetHeight.value,
+    transform: [{ translateY: sheetTranslateY.value }],
+  }));
 
   // Render post item
   const renderPost = useCallback(({ item, index }) => (
@@ -123,7 +182,6 @@ const PostFeed = ({
   // Render empty state
   const renderEmpty = useCallback(() => {
     if (loading) return null;
-    
     return (
       <Animated.View entering={FadeIn.duration(500)} style={styles.emptyContainer}>
         <Text style={styles.emptyEmoji}>🙏</Text>
@@ -145,7 +203,6 @@ const PostFeed = ({
         </View>
       );
     }
-
     if (loading && posts.length > 0) {
       return (
         <View style={styles.footerLoader}>
@@ -154,25 +211,21 @@ const PostFeed = ({
         </View>
       );
     }
-
     return null;
   }, [loading, pagination.hasMore, posts.length]);
 
   // Render header
-  const renderHeader = useCallback(() => {
-    return (
-      <>
-        {ListHeaderComponent && <ListHeaderComponent />}
-        {error && (
-          <View style={styles.errorContainer}>
-            <Text style={styles.errorText}>⚠️ {error}</Text>
-          </View>
-        )}
-      </>
-    );
-  }, [ListHeaderComponent, error]);
+  const renderHeader = useCallback(() => (
+    <>
+      {ListHeaderComponent && <ListHeaderComponent />}
+      {error && (
+        <View style={styles.errorContainer}>
+          <Text style={styles.errorText}>⚠️ {error}</Text>
+        </View>
+      )}
+    </>
+  ), [ListHeaderComponent, error]);
 
-  // Initial loading state with skeletons
   if (loading && posts.length === 0) {
     return (
       <FlatList
@@ -204,7 +257,6 @@ const PostFeed = ({
             onRefresh={refresh}
             colors={[theme.colors.primary]}
             tintColor={theme.colors.primary}
-            progressBackgroundColor={theme.colors.card}
           />
         }
         onEndReached={handleEndReached}
@@ -218,30 +270,52 @@ const PostFeed = ({
         initialNumToRender={5}
       />
 
-      {/* Comments Modal */}
+      {/* Draggable Comments Bottom Sheet */}
       <Modal
         visible={showComments}
         transparent
-        animationType="slide"
+        animationType="none"
         onRequestClose={closeComments}
       >
-        <Pressable style={styles.modalOverlay} onPress={closeComments}>
-          <Pressable style={styles.commentsSheet} onPress={(e) => e.stopPropagation()}>
-            <View style={styles.commentsHandle}>
-              <View style={styles.handle} />
-            </View>
-            
-            <View style={styles.commentsHeader}>
-              <Text style={styles.commentsTitle}>Comments</Text>
-              <Pressable onPress={closeComments} style={styles.closeButton}>
-                <Ionicons name="close" size={24} color={theme.colors.textMuted} />
-              </Pressable>
+        <View style={styles.modalOverlay}>
+          <Pressable style={styles.modalBackdrop} onPress={closeComments} />
+          
+          <Animated.View style={[styles.commentsSheet, sheetAnimatedStyle, { paddingBottom: insets.bottom }]}>
+            {/* Drag Handle */}
+            <View {...panResponder.panHandlers} style={styles.dragHandleContainer}>
+              <View style={styles.dragHandle} />
             </View>
 
-            <View style={styles.commentsBody}>
+            {/* Header */}
+            <View style={styles.commentsHeader}>
+              <Text style={styles.commentsTitle}>Comments</Text>
+              <View style={styles.headerActions}>
+                <Pressable onPress={() => {
+                  sheetHeight.value = withSpring(
+                    sheetHeight.value === MAX_SHEET_HEIGHT ? MID_SHEET_HEIGHT : MAX_SHEET_HEIGHT,
+                    { damping: 20 }
+                  );
+                }} style={styles.expandButton}>
+                  <Ionicons 
+                    name={sheetHeight.value === MAX_SHEET_HEIGHT ? "chevron-down" : "chevron-up"} 
+                    size={24} 
+                    color={theme.colors.textMuted} 
+                  />
+                </Pressable>
+                <Pressable onPress={closeComments} style={styles.closeButton}>
+                  <Ionicons name="close" size={24} color={theme.colors.textMuted} />
+                </Pressable>
+              </View>
+            </View>
+
+            {/* Comments List */}
+            <KeyboardAvoidingView 
+              behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+              style={styles.commentsContainer}
+            >
               {commentsLoading[activePostId] ? (
                 <View style={styles.commentsLoading}>
-                  <ActivityIndicator size="small" color={theme.colors.primary} />
+                  <ActivityIndicator size="large" color={theme.colors.primary} />
                   <Text style={styles.loadingText}>Loading comments...</Text>
                 </View>
               ) : (
@@ -269,38 +343,43 @@ const PostFeed = ({
                       <Text style={styles.noCommentsSubtext}>Be the first to comment!</Text>
                     </View>
                   }
-                  showsVerticalScrollIndicator={false}
-                  contentContainerStyle={{ paddingBottom: 20 }}
+                  contentContainerStyle={styles.commentsList}
+                  showsVerticalScrollIndicator={true}
+                  keyboardShouldPersistTaps="handled"
                 />
               )}
-            </View>
 
-            <View style={styles.commentInputRow}>
-              <TextInput
-                style={styles.commentInput}
-                placeholder="Write a comment..."
-                placeholderTextColor={theme.colors.grayMedium}
-                value={commentText}
-                onChangeText={setCommentText}
-                multiline
-              />
-              <Pressable 
-                style={[
-                  styles.commentSend,
-                  !commentText.trim() && styles.commentSendDisabled
-                ]} 
-                onPress={submitComment}
-                disabled={!commentText.trim()}
-              >
-                <Ionicons 
-                  name="send" 
-                  size={20} 
-                  color={commentText.trim() ? 'white' : theme.colors.grayMedium} 
-                />
-              </Pressable>
-            </View>
-          </Pressable>
-        </Pressable>
+              {/* Comment Input */}
+              <View style={styles.commentInputContainer}>
+                <View style={styles.commentInputWrapper}>
+                  <View style={styles.inputAvatar}>
+                    <Ionicons name="person" size={16} color="white" />
+                  </View>
+                  <TextInput
+                    style={styles.commentInput}
+                    placeholder="Add a comment..."
+                    placeholderTextColor={theme.colors.grayMedium}
+                    value={commentText}
+                    onChangeText={setCommentText}
+                    multiline
+                    maxLength={500}
+                  />
+                  <Pressable 
+                    style={[styles.commentSend, !commentText.trim() && styles.commentSendDisabled]} 
+                    onPress={submitComment}
+                    disabled={!commentText.trim()}
+                  >
+                    <Ionicons 
+                      name="send" 
+                      size={18} 
+                      color={commentText.trim() ? theme.colors.primary : theme.colors.grayMedium} 
+                    />
+                  </Pressable>
+                </View>
+              </View>
+            </KeyboardAvoidingView>
+          </Animated.View>
+        </View>
       </Modal>
     </>
   );
@@ -318,91 +397,49 @@ const styles = StyleSheet.create({
     paddingVertical: hp(10),
     paddingHorizontal: wp(10),
   },
-  emptyEmoji: {
-    fontSize: 60,
-    marginBottom: theme.spacing.md,
-  },
-  emptyTitle: {
-    fontSize: hp(2.4),
-    fontWeight: theme.fonts.bold,
-    color: theme.colors.textDark,
-    marginBottom: theme.spacing.sm,
-  },
-  emptySubtitle: {
-    fontSize: hp(1.6),
-    color: theme.colors.textMuted,
-    textAlign: 'center',
-    lineHeight: hp(2.4),
-  },
-  errorContainer: {
-    padding: theme.spacing.md,
-    marginHorizontal: wp(4),
-    marginVertical: hp(1),
-    backgroundColor: theme.colors.roseLight,
-    borderRadius: theme.radius.lg,
-  },
-  errorText: {
-    color: theme.colors.rose,
-    fontSize: hp(1.5),
-    textAlign: 'center',
-  },
-  footerLoader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingVertical: theme.spacing.xl,
-    gap: theme.spacing.sm,
-  },
-  loadingMoreText: {
-    fontSize: hp(1.5),
-    color: theme.colors.textMuted,
-  },
-  endOfFeed: {
-    alignItems: 'center',
-    paddingVertical: theme.spacing.xl,
-    paddingHorizontal: wp(10),
-  },
-  endOfFeedText: {
-    fontSize: hp(1.6),
-    color: theme.colors.textMuted,
-    fontWeight: theme.fonts.medium,
-  },
-  endOfFeedSubtext: {
-    fontSize: hp(1.4),
-    color: theme.colors.grayMedium,
-    marginTop: 4,
-  },
-  // Modal styles
+  emptyEmoji: { fontSize: 60, marginBottom: theme.spacing.md },
+  emptyTitle: { fontSize: hp(2.4), fontWeight: theme.fonts.bold, color: theme.colors.textDark, marginBottom: theme.spacing.sm },
+  emptySubtitle: { fontSize: hp(1.6), color: theme.colors.textMuted, textAlign: 'center', lineHeight: hp(2.4) },
+  errorContainer: { padding: theme.spacing.md, marginHorizontal: wp(4), marginVertical: hp(1), backgroundColor: theme.colors.roseLight, borderRadius: theme.radius.lg },
+  errorText: { color: theme.colors.rose, fontSize: hp(1.5), textAlign: 'center' },
+  footerLoader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', paddingVertical: theme.spacing.xl, gap: theme.spacing.sm },
+  loadingMoreText: { fontSize: hp(1.5), color: theme.colors.textMuted },
+  endOfFeed: { alignItems: 'center', paddingVertical: theme.spacing.xl, paddingHorizontal: wp(10) },
+  endOfFeedText: { fontSize: hp(1.6), color: theme.colors.textMuted, fontWeight: theme.fonts.medium },
+  endOfFeedSubtext: { fontSize: hp(1.4), color: theme.colors.grayMedium, marginTop: 4 },
+
+  // Bottom sheet styles
   modalOverlay: {
     flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.5)',
     justifyContent: 'flex-end',
+  },
+  modalBackdrop: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: 'rgba(0,0,0,0.4)',
   },
   commentsSheet: {
     backgroundColor: theme.colors.card,
     borderTopLeftRadius: 24,
     borderTopRightRadius: 24,
-    maxHeight: hp(75),
-    minHeight: hp(50),
+    overflow: 'hidden',
   },
-  commentsHandle: {
+  dragHandleContainer: {
     alignItems: 'center',
-    paddingTop: 12,
-    paddingBottom: 8,
+    paddingVertical: 12,
   },
-  handle: {
+  dragHandle: {
     width: 40,
     height: 4,
     borderRadius: 2,
     backgroundColor: theme.colors.grayMedium,
-    opacity: 0.3,
+    opacity: 0.4,
   },
   commentsHeader: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
     alignItems: 'center',
-    paddingHorizontal: theme.spacing.lg,
-    paddingBottom: theme.spacing.md,
+    justifyContent: 'space-between',
+    paddingHorizontal: theme.spacing.md,
+    paddingBottom: theme.spacing.sm,
     borderBottomWidth: StyleSheet.hairlineWidth,
     borderBottomColor: theme.colors.grayLight,
   },
@@ -411,107 +448,95 @@ const styles = StyleSheet.create({
     fontWeight: theme.fonts.bold,
     color: theme.colors.textDark,
   },
+  headerActions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  expandButton: {
+    padding: 8,
+    borderRadius: 20,
+  },
   closeButton: {
     padding: 8,
     borderRadius: 20,
-    backgroundColor: theme.colors.backgroundSecondary,
   },
-  commentsBody: {
+  commentsContainer: {
     flex: 1,
-    paddingHorizontal: theme.spacing.lg,
-    paddingTop: theme.spacing.md,
   },
   commentsLoading: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    gap: theme.spacing.sm,
+    gap: theme.spacing.md,
   },
   loadingText: {
     color: theme.colors.textMuted,
-    fontSize: hp(1.5),
+    fontSize: hp(1.6),
   },
-  commentItem: {
-    flexDirection: 'row',
-    paddingVertical: theme.spacing.sm,
-    gap: theme.spacing.sm,
-  },
-  commentAvatar: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    backgroundColor: theme.colors.primary,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  commentAvatarText: {
-    color: 'white',
-    fontWeight: theme.fonts.bold,
-    fontSize: 14,
-  },
-  commentContent: {
-    flex: 1,
-    backgroundColor: theme.colors.backgroundSecondary,
-    borderRadius: theme.radius.lg,
-    padding: theme.spacing.sm,
-  },
-  commentAuthor: {
-    fontSize: hp(1.5),
-    fontWeight: theme.fonts.semibold,
-    color: theme.colors.textDark,
-    marginBottom: 2,
-  },
-  commentText: {
-    fontSize: hp(1.5),
-    color: theme.colors.text,
-    lineHeight: hp(2.2),
+  commentsList: {
+    paddingHorizontal: theme.spacing.md,
+    paddingTop: theme.spacing.md,
+    paddingBottom: theme.spacing.md,
+    flexGrow: 1,
   },
   noCommentsContainer: {
-    flex: 1,
-    justifyContent: 'center',
     alignItems: 'center',
-    paddingVertical: hp(5),
+    paddingVertical: hp(8),
   },
   noComments: {
-    textAlign: 'center',
-    color: theme.colors.textMuted,
+    color: theme.colors.textDark,
     marginTop: theme.spacing.md,
     fontSize: hp(1.8),
-    fontWeight: theme.fonts.medium,
+    fontWeight: theme.fonts.semibold,
   },
   noCommentsSubtext: {
-    color: theme.colors.grayMedium,
+    color: theme.colors.textMuted,
     fontSize: hp(1.4),
     marginTop: 4,
   },
-  commentInputRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: theme.spacing.sm,
-    padding: theme.spacing.md,
+  commentInputContainer: {
+    backgroundColor: theme.colors.card,
     borderTopWidth: StyleSheet.hairlineWidth,
     borderTopColor: theme.colors.grayLight,
+    paddingHorizontal: theme.spacing.md,
+    paddingVertical: theme.spacing.sm,
+  },
+  commentInputWrapper: {
+    flexDirection: 'row',
+    alignItems: 'flex-end',
+    gap: theme.spacing.sm,
+  },
+  inputAvatar: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: theme.colors.primary,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 4,
   },
   commentInput: {
     flex: 1,
     backgroundColor: theme.colors.backgroundSecondary,
     borderRadius: 20,
     paddingHorizontal: theme.spacing.md,
-    paddingVertical: theme.spacing.sm,
-    fontSize: hp(1.6),
+    paddingTop: 10,
+    paddingBottom: 10,
+    fontSize: hp(1.5),
     color: theme.colors.text,
     maxHeight: 100,
+    minHeight: 40,
   },
   commentSend: {
-    backgroundColor: theme.colors.primary,
-    width: 44,
-    height: 44,
-    borderRadius: 22,
+    width: 40,
+    height: 40,
+    borderRadius: 20,
     alignItems: 'center',
     justifyContent: 'center',
   },
   commentSendDisabled: {
-    backgroundColor: theme.colors.backgroundSecondary,
+    opacity: 0.5,
   },
 });
 

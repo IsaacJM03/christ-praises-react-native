@@ -432,13 +432,13 @@ const postController = {
     }
   },
 
-  // Get comment replies
+  // Get comment replies - fix to include replies_count
   async getCommentReplies(req, res) {
     try {
       const { commentId } = req.params;
       const user_id = req.user.id;
       const page = parseInt(req.query.page) || 1;
-      const limit = parseInt(req.query.limit) || 10;
+      const limit = parseInt(req.query.limit) || 20;
       const offset = (page - 1) * limit;
 
       const [replies] = await db.query(
@@ -451,13 +451,44 @@ const postController = {
         [commentId]
       );
 
-      const repliesWithCounts = replies.map(reply => ({
-        ...reply,
-        is_liked: false,
-        likes_count: 0,
-        replies_count: 0
+      // Add counts for each reply
+      const repliesWithCounts = await Promise.all(replies.map(async (reply) => {
+        let likesCount = 0;
+        let isLiked = false;
+        let repliesCount = 0;
+
+        try {
+          const [[likesResult]] = await db.execute(
+            'SELECT COUNT(*) as count FROM comment_likes WHERE comment_id = ?',
+            [reply.id]
+          );
+          likesCount = likesResult?.count || 0;
+
+          const [[isLikedResult]] = await db.execute(
+            'SELECT COUNT(*) as count FROM comment_likes WHERE comment_id = ? AND user_id = ?',
+            [reply.id, user_id]
+          );
+          isLiked = (isLikedResult?.count || 0) > 0;
+        } catch (e) {
+          // comment_likes table might not exist
+        }
+
+        // Count nested replies (replies to this reply)
+        const [[nestedRepliesResult]] = await db.execute(
+          'SELECT COUNT(*) as count FROM post_comments WHERE parent_id = ? AND deleted_at IS NULL',
+          [reply.id]
+        );
+        repliesCount = nestedRepliesResult?.count || 0;
+
+        return {
+          ...reply,
+          likes_count: likesCount,
+          is_liked: isLiked,
+          replies_count: repliesCount
+        };
       }));
 
+      console.log(`Returning ${repliesWithCounts.length} replies for comment ${commentId}`);
       res.json({ success: true, data: repliesWithCounts });
     } catch (error) {
       console.error('Get comment replies error:', error);

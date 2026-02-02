@@ -256,66 +256,150 @@ export const PostProvider = ({ children }) => {
     }
   }, []);
 
-  // Toggle like on a comment
+  // Toggle like on a comment (works for both top-level and nested)
   const toggleCommentLike = useCallback(async (postId, commentId) => {
-    // Optimistic update
-    setCommentsByPost(prev => ({
-      ...prev,
-      [postId]: (prev[postId] || []).map(comment => {
-        if (comment.id === commentId) {
-          const newIsLiked = !comment.is_liked;
-          return {
-            ...comment,
-            is_liked: newIsLiked,
-            likes_count: newIsLiked ? (comment.likes_count || 0) + 1 : Math.max(0, (comment.likes_count || 0) - 1)
-          };
+    // Check if it's a top-level comment
+    const isTopLevel = (commentsByPost[postId] || []).some(c => c.id === commentId);
+    
+    if (isTopLevel) {
+      // Optimistic update for top-level comment
+      setCommentsByPost(prev => ({
+        ...prev,
+        [postId]: (prev[postId] || []).map(comment => {
+          if (comment.id === commentId) {
+            const newIsLiked = !comment.is_liked;
+            return {
+              ...comment,
+              is_liked: newIsLiked,
+              likes_count: newIsLiked ? (comment.likes_count || 0) + 1 : Math.max(0, (comment.likes_count || 0) - 1)
+            };
+          }
+          return comment;
+        })
+      }));
+    } else {
+      // It's a nested reply - update in repliesByComment
+      setRepliesByComment(prev => {
+        const updated = { ...prev };
+        for (const parentId in updated) {
+          updated[parentId] = (updated[parentId] || []).map(reply => {
+            if (reply.id === commentId) {
+              const newIsLiked = !reply.is_liked;
+              return {
+                ...reply,
+                is_liked: newIsLiked,
+                likes_count: newIsLiked ? (reply.likes_count || 0) + 1 : Math.max(0, (reply.likes_count || 0) - 1)
+              };
+            }
+            return reply;
+          });
         }
-        return comment;
-      })
-    }));
+        return updated;
+      });
+    }
 
     try {
       const result = await postService.toggleCommentLike(postId, commentId);
       if (!result.success) {
         // Revert on failure
-        setCommentsByPost(prev => ({
-          ...prev,
-          [postId]: (prev[postId] || []).map(comment => {
-            if (comment.id === commentId) {
-              const revertIsLiked = !comment.is_liked;
-              return {
-                ...comment,
-                is_liked: revertIsLiked,
-                likes_count: revertIsLiked ? (comment.likes_count || 0) + 1 : Math.max(0, (comment.likes_count || 0) - 1)
-              };
+        if (isTopLevel) {
+          setCommentsByPost(prev => ({
+            ...prev,
+            [postId]: (prev[postId] || []).map(comment => {
+              if (comment.id === commentId) {
+                const revertIsLiked = !comment.is_liked;
+                return {
+                  ...comment,
+                  is_liked: revertIsLiked,
+                  likes_count: revertIsLiked ? (comment.likes_count || 0) + 1 : Math.max(0, (comment.likes_count || 0) - 1)
+                };
+              }
+              return comment;
+            })
+          }));
+        } else {
+          setRepliesByComment(prev => {
+            const updated = { ...prev };
+            for (const parentId in updated) {
+              updated[parentId] = (updated[parentId] || []).map(reply => {
+                if (reply.id === commentId) {
+                  const revertIsLiked = !reply.is_liked;
+                  return {
+                    ...reply,
+                    is_liked: revertIsLiked,
+                    likes_count: revertIsLiked ? (reply.likes_count || 0) + 1 : Math.max(0, (reply.likes_count || 0) - 1)
+                  };
+                }
+                return reply;
+              });
             }
-            return comment;
-          })
-        }));
+            return updated;
+          });
+        }
       }
       return result;
     } catch (err) {
       return { success: false, message: 'Failed to toggle comment like' };
     }
-  }, []);
+  }, [commentsByPost]);
 
-  // Fetch replies for a comment
+  // Fetch replies for a comment (works for any depth)
   const fetchReplies = useCallback(async (postId, commentId) => {
     try {
       setRepliesLoading(prev => ({ ...prev, [commentId]: true }));
+      console.log('Fetching replies for comment:', commentId);
+      
       const result = await postService.getCommentReplies(postId, commentId);
+      console.log('Replies result:', result);
+      
       if (result.success) {
-        // Normalize the data
         const normalizedReplies = (result.data || []).map(reply => ({
           ...reply,
           is_liked: Boolean(reply.is_liked),
           likes_count: parseInt(reply.likes_count) || 0,
           replies_count: parseInt(reply.replies_count) || 0,
         }));
+        
+        // Store replies keyed by parent comment ID
         setRepliesByComment(prev => ({
           ...prev,
           [commentId]: normalizedReplies,
         }));
+        
+        // Update the parent's replies_count in commentsByPost (if top-level)
+        setCommentsByPost(prev => {
+          const updated = { ...prev };
+          for (const pId in updated) {
+            updated[pId] = (updated[pId] || []).map(comment => 
+              comment.id === commentId 
+                ? { ...comment, replies_count: normalizedReplies.length }
+                : comment
+            );
+          }
+          return updated;
+        });
+        
+        // Also update in repliesByComment (if it's a nested reply)
+        setRepliesByComment(prev => {
+          const updated = { ...prev };
+          for (const pId in updated) {
+            if (pId !== String(commentId)) { // Don't modify the one we just added to
+              updated[pId] = (updated[pId] || []).map(reply => 
+                reply.id === commentId
+                  ? { ...reply, replies_count: (reply.replies_count || 0) + 1 }
+                  : reply
+              );
+            }
+          }
+          return updated;
+        });
+        
+        // Increment total comment count on the post
+        setPosts(prev => prev.map(p => (
+          p.id === postId
+            ? { ...p, comments_count: (p.comments_count || 0) + 1 }
+            : p
+        )));
       }
       return result;
     } catch (err) {
@@ -326,79 +410,71 @@ export const PostProvider = ({ children }) => {
     }
   }, []);
 
-  // Add reply to a comment
+  // Add reply to a comment (works for any depth)
   const addReply = useCallback(async (postId, parentCommentId, content) => {
     try {
+      console.log('Adding reply to comment:', parentCommentId, 'content:', content);
       const result = await postService.addComment(postId, content, parentCommentId);
+      console.log('Add reply result:', result);
+      
       if (result.success && result.data) {
+        const normalizedReply = {
+          ...result.data,
+          is_liked: false,
+          likes_count: 0,
+          replies_count: 0,
+        };
+        
+        // Add to replies for this parent
         setRepliesByComment(prev => ({
           ...prev,
-          [parentCommentId]: [...(prev[parentCommentId] || []), result.data],
+          [parentCommentId]: [...(prev[parentCommentId] || []), normalizedReply],
         }));
-        // Update reply count on parent comment
-        setCommentsByPost(prev => ({
-          ...prev,
-          [postId]: (prev[postId] || []).map(comment => 
-            comment.id === parentCommentId 
-              ? { ...comment, replies_count: (comment.replies_count || 0) + 1 }
-              : comment
-          )
-        }));
+        
+        // Update reply count on parent in commentsByPost (if top-level)
+        setCommentsByPost(prev => {
+          const updated = { ...prev };
+          for (const pId in updated) {
+            updated[pId] = (updated[pId] || []).map(comment => 
+              comment.id === parentCommentId 
+                ? { ...comment, replies_count: (comment.replies_count || 0) + 1 }
+                : comment
+            );
+          }
+          return updated;
+        });
+        
+        // Update reply count on parent in repliesByComment (if nested)
+        setRepliesByComment(prev => {
+          const updated = { ...prev };
+          for (const pId in updated) {
+            if (pId !== String(parentCommentId)) { // Don't modify the one we just added to
+              updated[pId] = (updated[pId] || []).map(reply => 
+                reply.id === parentCommentId
+                  ? { ...reply, replies_count: (reply.replies_count || 0) + 1 }
+                  : reply
+              );
+            }
+          }
+          return updated;
+        });
+        
+        // Increment total comment count on the post
+        setPosts(prev => prev.map(p => (
+          p.id === postId
+            ? { ...p, comments_count: (p.comments_count || 0) + 1 }
+            : p
+        )));
       }
       return result;
     } catch (err) {
+      console.error('Add reply error:', err);
       return { success: false, message: 'Failed to add reply' };
     }
   }, []);
 
-  // Toggle like on a reply (nested comment)
-  const toggleReplyLike = useCallback(async (postId, replyId) => {
-    // Find which parent comment this reply belongs to and update it
-    setRepliesByComment(prev => {
-      const updated = { ...prev };
-      for (const parentId in updated) {
-        updated[parentId] = (updated[parentId] || []).map(reply => {
-          if (reply.id === replyId) {
-            const newIsLiked = !reply.is_liked;
-            return {
-              ...reply,
-              is_liked: newIsLiked,
-              likes_count: newIsLiked ? (reply.likes_count || 0) + 1 : Math.max(0, (reply.likes_count || 0) - 1)
-            };
-          }
-          return reply;
-        });
-      }
-      return updated;
-    });
-
-    try {
-      const result = await postService.toggleCommentLike(postId, replyId);
-      if (!result.success) {
-        // Revert on failure
-        setRepliesByComment(prev => {
-          const updated = { ...prev };
-          for (const parentId in updated) {
-            updated[parentId] = (updated[parentId] || []).map(reply => {
-              if (reply.id === replyId) {
-                const revertIsLiked = !reply.is_liked;
-                return {
-                  ...reply,
-                  is_liked: revertIsLiked,
-                  likes_count: revertIsLiked ? (reply.likes_count || 0) + 1 : Math.max(0, (reply.likes_count || 0) - 1)
-                };
-              }
-              return reply;
-            });
-          }
-          return updated;
-        });
-      }
-      return result;
-    } catch (err) {
-      return { success: false, message: 'Failed to toggle reply like' };
-    }
-  }, []);
+  // Alias for backwards compatibility
+  const toggleReplyLike = toggleCommentLike;
 
   const value = {
     posts,
