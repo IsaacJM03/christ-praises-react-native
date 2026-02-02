@@ -24,4 +24,8 @@ router.get('/:id/comments', postController.getComments);
 router.post('/:id/comments', postController.addComment);
 router.delete('/:id/comments/:commentId', postController.deleteComment);
 
+// Comment interactions
+router.post('/:id/comments/:commentId/like', postController.toggleCommentLike);
+router.get('/:id/comments/:commentId/replies', postController.getCommentReplies);
+
 module.exports = router;

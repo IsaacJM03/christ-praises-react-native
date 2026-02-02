@@ -12,7 +12,11 @@ export const PostProvider = ({ children }) => {
     page: 1,
     hasMore: true
   });
-  
+  const [commentsByPost, setCommentsByPost] = useState({});
+  const [commentsLoading, setCommentsLoading] = useState({});
+  const [repliesByComment, setRepliesByComment] = useState({});
+  const [repliesLoading, setRepliesLoading] = useState({});
+
   // Prevent duplicate fetches
   const isFetching = useRef(false);
 
@@ -193,6 +197,209 @@ export const PostProvider = ({ children }) => {
     }
   }, []);
 
+  // Fetch comments for a post
+  const fetchComments = useCallback(async (postId, page = 1) => {
+    try {
+      setCommentsLoading(prev => ({ ...prev, [postId]: true }));
+      console.log('Fetching comments for post:', postId);
+      
+      const result = await postService.getComments(postId, page, 20);
+      
+      console.log('Comments result:', JSON.stringify(result, null, 2));
+      
+      if (result.success) {
+        // Normalize the data - MySQL returns 0/1 for booleans
+        const normalizedComments = (result.data || []).map(comment => ({
+          ...comment,
+          is_liked: Boolean(comment.is_liked),
+          likes_count: parseInt(comment.likes_count) || 0,
+          replies_count: parseInt(comment.replies_count) || 0,
+        }));
+        
+        console.log('Normalized comments:', normalizedComments.length);
+        
+        setCommentsByPost(prev => ({
+          ...prev,
+          [postId]: normalizedComments,
+        }));
+      } else {
+        console.log('Failed to fetch comments:', result.message);
+      }
+      return result;
+    } catch (err) {
+      console.error('Fetch comments error:', err);
+      return { success: false, message: 'Failed to fetch comments' };
+    } finally {
+      setCommentsLoading(prev => ({ ...prev, [postId]: false }));
+    }
+  }, []);
+
+  // Add a comment to a post
+  const addComment = useCallback(async (postId, content) => {
+    try {
+      const result = await postService.addComment(postId, content);
+      if (result.success && result.data) {
+        setCommentsByPost(prev => ({
+          ...prev,
+          [postId]: [result.data, ...(prev[postId] || [])],
+        }));
+        // increment comment count locally
+        setPosts(prev => prev.map(p => (
+          p.id === postId
+            ? { ...p, comments_count: (p.comments_count || 0) + 1 }
+            : p
+        )));
+      }
+      return result;
+    } catch (err) {
+      return { success: false, message: 'Failed to add comment' };
+    }
+  }, []);
+
+  // Toggle like on a comment
+  const toggleCommentLike = useCallback(async (postId, commentId) => {
+    // Optimistic update
+    setCommentsByPost(prev => ({
+      ...prev,
+      [postId]: (prev[postId] || []).map(comment => {
+        if (comment.id === commentId) {
+          const newIsLiked = !comment.is_liked;
+          return {
+            ...comment,
+            is_liked: newIsLiked,
+            likes_count: newIsLiked ? (comment.likes_count || 0) + 1 : Math.max(0, (comment.likes_count || 0) - 1)
+          };
+        }
+        return comment;
+      })
+    }));
+
+    try {
+      const result = await postService.toggleCommentLike(postId, commentId);
+      if (!result.success) {
+        // Revert on failure
+        setCommentsByPost(prev => ({
+          ...prev,
+          [postId]: (prev[postId] || []).map(comment => {
+            if (comment.id === commentId) {
+              const revertIsLiked = !comment.is_liked;
+              return {
+                ...comment,
+                is_liked: revertIsLiked,
+                likes_count: revertIsLiked ? (comment.likes_count || 0) + 1 : Math.max(0, (comment.likes_count || 0) - 1)
+              };
+            }
+            return comment;
+          })
+        }));
+      }
+      return result;
+    } catch (err) {
+      return { success: false, message: 'Failed to toggle comment like' };
+    }
+  }, []);
+
+  // Fetch replies for a comment
+  const fetchReplies = useCallback(async (postId, commentId) => {
+    try {
+      setRepliesLoading(prev => ({ ...prev, [commentId]: true }));
+      const result = await postService.getCommentReplies(postId, commentId);
+      if (result.success) {
+        // Normalize the data
+        const normalizedReplies = (result.data || []).map(reply => ({
+          ...reply,
+          is_liked: Boolean(reply.is_liked),
+          likes_count: parseInt(reply.likes_count) || 0,
+          replies_count: parseInt(reply.replies_count) || 0,
+        }));
+        setRepliesByComment(prev => ({
+          ...prev,
+          [commentId]: normalizedReplies,
+        }));
+      }
+      return result;
+    } catch (err) {
+      console.error('Fetch replies error:', err);
+      return { success: false, message: 'Failed to fetch replies' };
+    } finally {
+      setRepliesLoading(prev => ({ ...prev, [commentId]: false }));
+    }
+  }, []);
+
+  // Add reply to a comment
+  const addReply = useCallback(async (postId, parentCommentId, content) => {
+    try {
+      const result = await postService.addComment(postId, content, parentCommentId);
+      if (result.success && result.data) {
+        setRepliesByComment(prev => ({
+          ...prev,
+          [parentCommentId]: [...(prev[parentCommentId] || []), result.data],
+        }));
+        // Update reply count on parent comment
+        setCommentsByPost(prev => ({
+          ...prev,
+          [postId]: (prev[postId] || []).map(comment => 
+            comment.id === parentCommentId 
+              ? { ...comment, replies_count: (comment.replies_count || 0) + 1 }
+              : comment
+          )
+        }));
+      }
+      return result;
+    } catch (err) {
+      return { success: false, message: 'Failed to add reply' };
+    }
+  }, []);
+
+  // Toggle like on a reply (nested comment)
+  const toggleReplyLike = useCallback(async (postId, replyId) => {
+    // Find which parent comment this reply belongs to and update it
+    setRepliesByComment(prev => {
+      const updated = { ...prev };
+      for (const parentId in updated) {
+        updated[parentId] = (updated[parentId] || []).map(reply => {
+          if (reply.id === replyId) {
+            const newIsLiked = !reply.is_liked;
+            return {
+              ...reply,
+              is_liked: newIsLiked,
+              likes_count: newIsLiked ? (reply.likes_count || 0) + 1 : Math.max(0, (reply.likes_count || 0) - 1)
+            };
+          }
+          return reply;
+        });
+      }
+      return updated;
+    });
+
+    try {
+      const result = await postService.toggleCommentLike(postId, replyId);
+      if (!result.success) {
+        // Revert on failure
+        setRepliesByComment(prev => {
+          const updated = { ...prev };
+          for (const parentId in updated) {
+            updated[parentId] = (updated[parentId] || []).map(reply => {
+              if (reply.id === replyId) {
+                const revertIsLiked = !reply.is_liked;
+                return {
+                  ...reply,
+                  is_liked: revertIsLiked,
+                  likes_count: revertIsLiked ? (reply.likes_count || 0) + 1 : Math.max(0, (reply.likes_count || 0) - 1)
+                };
+              }
+              return reply;
+            });
+          }
+          return updated;
+        });
+      }
+      return result;
+    } catch (err) {
+      return { success: false, message: 'Failed to toggle reply like' };
+    }
+  }, []);
+
   const value = {
     posts,
     loading,
@@ -205,7 +412,17 @@ export const PostProvider = ({ children }) => {
     createPost,
     deletePost,
     toggleLike,
-    toggleBookmark
+    toggleBookmark,
+    commentsByPost,
+    commentsLoading,
+    fetchComments,
+    addComment,
+    toggleCommentLike,
+    repliesByComment,
+    repliesLoading,
+    fetchReplies,
+    addReply,
+    toggleReplyLike,
   };
 
   return (
