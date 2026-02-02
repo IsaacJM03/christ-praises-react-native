@@ -1,28 +1,46 @@
 import React, { useEffect, useState } from "react";
-import { View, StyleSheet, Text } from "react-native";
+import { View, ActivityIndicator, StyleSheet } from "react-native";
 import { useRouter } from "expo-router";
-import { LinearGradient } from 'expo-linear-gradient';
-import Animated, { FadeIn } from 'react-native-reanimated';
+import { authService } from "../lib/authService";
 import { theme } from "../constants/theme";
-import { hp } from "../helpers/common";
 import InteractiveLogo from "../components/InteractiveLogo";
+import { hp } from "../helpers/common";
 
 const Index = () => {
   const router = useRouter();
-  const [animationComplete, setAnimationComplete] = useState(false);
+  const [checking, setChecking] = useState(true);
 
   useEffect(() => {
-    if (animationComplete) {
-      const timer = setTimeout(() => {
-        router.replace("/welcome");
-      }, 800);
-      return () => clearTimeout(timer);
-    }
-  }, [animationComplete, router]);
+    const checkAuth = async () => {
+      try {
+        const token = await authService.getToken();
 
-  const handleAnimationComplete = () => {
-    setAnimationComplete(true);
-  };
+        if (token) {
+          // User is logged in, go to home
+          router.replace("/(tabs)");
+        } else {
+          // User is not logged in, go to welcome
+          router.replace("/welcome");
+        }
+      } catch (error) {
+        console.error("Auth check error:", error);
+        router.replace("/welcome");
+      } finally {
+        setChecking(false);
+      }
+    };
+
+    // Small delay to prevent flash
+    setTimeout(checkAuth, 100);
+  }, []);
+
+  if (checking) {
+    return (
+      <View style={styles.container}>
+        <ActivityIndicator size="large" color={theme.colors.primary} />
+      </View>
+    );
+  }
 
   return (
     <View style={styles.container}>
@@ -35,26 +53,23 @@ const Index = () => {
         <InteractiveLogo 
           mode="splash"
           size={hp(25)}
-          onAnimationComplete={handleAnimationComplete}
         />
         
-        <Animated.View 
-          entering={FadeIn.delay(600).duration(400)}
-          style={styles.textContainer}
-        >
+        <View style={styles.textContainer}>
           <Text style={styles.title}>Christ Praises</Text>
           <Text style={styles.subtitle}>Can I Testify?</Text>
-        </Animated.View>
+        </View>
       </View>
     </View>
   );
-}
+};
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
+    backgroundColor: theme.colors.background,
   },
   gradient: {
     ...StyleSheet.absoluteFillObject,

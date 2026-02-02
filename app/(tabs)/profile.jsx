@@ -1,211 +1,131 @@
-import React, { useState } from 'react';
-import {
-  StyleSheet,
-  View,
-  Text,
-  ScrollView,
-  Alert,
-  Pressable,
-} from 'react-native';
-import Animated, {
-  FadeInDown,
-  FadeInUp,
-  useSharedValue,
-  useAnimatedStyle,
-  interpolate,
-  useAnimatedScrollHandler,
-} from 'react-native-reanimated';
+import React, { useState, useEffect } from 'react';
+import { StyleSheet, View, Text, Pressable, Image, ScrollView, Alert } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
-import { useRouter } from 'expo-router';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
+import { Ionicons } from '@expo/vector-icons';
+import { useRouter } from 'expo-router';
+import Animated, { FadeIn, FadeInDown } from 'react-native-reanimated';
 import { theme } from '../../constants/theme';
-import { hp } from '../../helpers/common';
-import Avatar from '../../components/Avatar';
-import AnimatedCard from '../../components/AnimatedCard';
-import InteractiveLogo from '../../components/InteractiveLogo';
-import Icon from '../../assets/icons';
+import { hp, wp } from '../../helpers/common';
+import { authService } from '../../lib/authService';
 
-const AnimatedScrollView = Animated.createAnimatedComponent(ScrollView);
-
-const mockUserData = {
-  name: 'Guest User',
-  email: 'guest@christpraises.com',
-  joinDate: 'January 2024',
-  postsCount: 12,
-  friendsCount: 48,
-  likesCount: 156,
-};
-
-const menuItems = [
-  { id: '1', title: 'Edit Profile', icon: 'edit', action: 'edit' },
-  { id: '2', title: 'Notifications', icon: 'heart', action: 'notifications' },
-  { id: '3', title: 'Privacy Settings', icon: 'lock', action: 'privacy' },
-  { id: '4', title: 'Help & Support', icon: 'comment', action: 'help' },
-  { id: '5', title: 'About Christ Praises', icon: 'home', action: 'about' },
-];
-
-// Animated menu item
-const MenuItem = ({ item, index, onPress }) => {
-  return (
-    <AnimatedCard
-      key={item.id}
-      delay={300 + index * 50}
-      style={styles.menuItem}
-      onPress={onPress}
-    >
-      <View style={styles.menuIconContainer}>
-        <Icon name={item.icon} size={22} color={theme.colors.primary} />
-      </View>
-      <Text style={styles.menuTitle}>{item.title}</Text>
-      <Icon
-        name="arrowLeft"
-        size={18}
-        color={theme.colors.grayMedium}
-        style={{ transform: [{ rotate: '180deg' }] }}
-      />
-    </AnimatedCard>
-  );
-};
-
-const Profile = () => {
+const ProfileScreen = () => {
+  const { top, bottom } = useSafeAreaInsets();
   const router = useRouter();
-  const [user] = useState(mockUserData);
-  const scrollY = useSharedValue(0);
+  const [user, setUser] = useState(null);
 
-  const scrollHandler = useAnimatedScrollHandler({
-    onScroll: (event) => {
-      scrollY.value = event.contentOffset.y;
-    },
-  });
-
-  const headerStyle = useAnimatedStyle(() => {
-    const opacity = interpolate(scrollY.value, [0, 100], [1, 0.3]);
-    const scale = interpolate(scrollY.value, [0, 100], [1, 0.9]);
-    return {
-      opacity,
-      transform: [{ scale }],
+  useEffect(() => {
+    const loadUser = async () => {
+      const userData = await authService.getUser();
+      setUser(userData);
     };
-  });
+    loadUser();
+  }, []);
 
-  const handleMenuPress = (action) => {
-    switch (action) {
-      case 'edit':
-        Alert.alert('Edit Profile', 'Profile editing coming soon!');
-        break;
-      case 'about':
-        Alert.alert(
-          'About Christ Praises',
-          'Christ Praises v1.0.0\n\nA community app for believers to connect, share, and grow in faith together.\n\nMade with ❤️ for the community.',
-          [{ text: 'OK' }]
-        );
-        break;
-      case 'logout':
-        Alert.alert('Logout', 'Are you sure you want to logout?', [
-          { text: 'Cancel', style: 'cancel' },
-          { text: 'Logout', style: 'destructive', onPress: () => router.replace('/welcome') },
-        ]);
-        break;
-      default:
-        Alert.alert(action, 'Feature coming soon!');
-    }
+  const handleLogout = async () => {
+    Alert.alert(
+      'Log Out',
+      'Are you sure you want to log out?',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        { 
+          text: 'Log Out', 
+          style: 'destructive',
+          onPress: async () => {
+            await authService.logout();
+            router.replace('/');
+          }
+        },
+      ]
+    );
   };
 
-  const renderStats = () => (
-    <Animated.View entering={FadeInDown.delay(200)} style={styles.statsContainer}>
-      <View style={styles.statItem}>
-        <Text style={styles.statValue}>{user.postsCount}</Text>
-        <Text style={styles.statLabel}>Posts</Text>
-      </View>
-      <View style={styles.statDivider} />
-      <View style={styles.statItem}>
-        <Text style={styles.statValue}>{user.friendsCount}</Text>
-        <Text style={styles.statLabel}>Friends</Text>
-      </View>
-      <View style={styles.statDivider} />
-      <View style={styles.statItem}>
-        <Text style={styles.statValue}>{user.likesCount}</Text>
-        <Text style={styles.statLabel}>Likes</Text>
-      </View>
-    </Animated.View>
-  );
-
-  const renderAboutSection = () => (
-    <Animated.View entering={FadeInDown.delay(700)} style={styles.aboutSection}>
-      <View style={styles.aboutHeader}>
-        <InteractiveLogo mode="home" size={hp(8)} motionIntensity={0.5} />
-        <View style={styles.aboutTextContainer}>
-          <Text style={styles.aboutTitle}>Christ Praises</Text>
-          <Text style={styles.aboutVersion}>Version 1.0.0</Text>
-        </View>
-      </View>
-      <Text style={styles.aboutDescription}>
-        A community app for believers to connect, share their journey, lift each other up, and celebrate God's grace together.
-      </Text>
-    </Animated.View>
-  );
+  const menuItems = [
+    { icon: 'person-outline', label: 'Edit Profile', onPress: () => {} },
+    { icon: 'bookmark-outline', label: 'Saved Posts', onPress: () => router.push('/(tabs)/saved') },
+    { icon: 'heart-outline', label: 'Liked Posts', onPress: () => {} },
+    { icon: 'settings-outline', label: 'Settings', onPress: () => {} },
+    { icon: 'help-circle-outline', label: 'Help & Support', onPress: () => {} },
+    { icon: 'information-circle-outline', label: 'About', onPress: () => {} },
+  ];
 
   return (
     <View style={styles.container}>
       <StatusBar style="light" />
+      
       <LinearGradient
-        colors={theme.colors.gradient.auth}
-        style={styles.headerGradient}
-      />
-
-      <AnimatedScrollView
-        onScroll={scrollHandler}
-        scrollEventThrottle={16}
-        showsVerticalScrollIndicator={false}
-        contentContainerStyle={styles.scrollContent}
+        colors={[theme.colors.primary, theme.colors.primaryDark]}
+        style={[styles.headerGradient, { paddingTop: top + hp(2) }]}
       >
-        <Animated.View style={[styles.profileHeader, headerStyle]}>
-          <Animated.View entering={FadeInUp.delay(100)}>
-            <Avatar name={user.name} size={100} style={styles.avatar} />
-          </Animated.View>
-          <Animated.View entering={FadeInDown.delay(150)}>
-            <Text style={styles.userName}>{user.name}</Text>
-            <Text style={styles.userEmail}>{user.email}</Text>
-            <View style={styles.memberSince}>
-              <Icon name="heart" size={14} color={theme.colors.primaryLight} />
-              <Text style={styles.joinDate}>Member since {user.joinDate}</Text>
+        <Animated.View entering={FadeIn.duration(500)} style={styles.profileSection}>
+          {user?.image ? (
+            <Image source={{ uri: user.image }} style={styles.avatar} />
+          ) : (
+            <View style={styles.avatarPlaceholder}>
+              <Text style={styles.avatarText}>
+                {user?.name?.charAt(0)?.toUpperCase() || '?'}
+              </Text>
             </View>
-          </Animated.View>
+          )}
+          <Text style={styles.userName}>{user?.name || 'User'}</Text>
+          <Text style={styles.userEmail}>{user?.email || ''}</Text>
+          
+          <View style={styles.statsRow}>
+            <View style={styles.statItem}>
+              <Text style={styles.statNumber}>0</Text>
+              <Text style={styles.statLabel}>Posts</Text>
+            </View>
+            <View style={styles.statDivider} />
+            <View style={styles.statItem}>
+              <Text style={styles.statNumber}>0</Text>
+              <Text style={styles.statLabel}>Followers</Text>
+            </View>
+            <View style={styles.statDivider} />
+            <View style={styles.statItem}>
+              <Text style={styles.statNumber}>0</Text>
+              <Text style={styles.statLabel}>Following</Text>
+            </View>
+          </View>
         </Animated.View>
+      </LinearGradient>
 
-        {renderStats()}
-
-        <View style={styles.menuContainer}>
+      <ScrollView 
+        style={styles.content}
+        contentContainerStyle={{ paddingBottom: bottom + hp(2) }}
+        showsVerticalScrollIndicator={false}
+      >
+        <View style={styles.menuSection}>
           {menuItems.map((item, index) => (
-            <MenuItem
-              key={item.id}
-              item={item}
-              index={index}
-              onPress={() => handleMenuPress(item.action)}
-            />
+            <Animated.View 
+              key={item.label}
+              entering={FadeInDown.delay(index * 50).duration(400)}
+            >
+              <Pressable style={styles.menuItem} onPress={item.onPress}>
+                <View style={styles.menuIconContainer}>
+                  <Ionicons name={item.icon} size={22} color={theme.colors.primary} />
+                </View>
+                <Text style={styles.menuLabel}>{item.label}</Text>
+                <Ionicons name="chevron-forward" size={20} color={theme.colors.grayMedium} />
+              </Pressable>
+            </Animated.View>
           ))}
         </View>
 
-        <AnimatedCard
-          delay={600}
-          style={[styles.menuItem, styles.logoutItem]}
-          onPress={() => handleMenuPress('logout')}
-        >
-          <View style={[styles.menuIconContainer, styles.logoutIconContainer]}>
-            <Icon name="logout" size={22} color={theme.colors.rose} />
-          </View>
-          <Text style={[styles.menuTitle, styles.logoutText]}>Logout</Text>
-        </AnimatedCard>
+        <Animated.View entering={FadeInDown.delay(300).duration(400)}>
+          <Pressable style={styles.logoutButton} onPress={handleLogout}>
+            <Ionicons name="log-out-outline" size={22} color={theme.colors.rose} />
+            <Text style={styles.logoutText}>Log Out</Text>
+          </Pressable>
+        </Animated.View>
 
-        {renderAboutSection()}
-
-        <View style={styles.footer}>
-          <Text style={styles.footerText}>Made with ❤️ for the community</Text>
-          <Text style={styles.footerSubtext}>© {new Date().getFullYear()} Christ Praises</Text>
-        </View>
-      </AnimatedScrollView>
+        <Text style={styles.versionText}>Version 1.0.0</Text>
+      </ScrollView>
     </View>
   );
 };
+
+export default ProfileScreen;
 
 const styles = StyleSheet.create({
   container: {
@@ -213,158 +133,129 @@ const styles = StyleSheet.create({
     backgroundColor: theme.colors.background,
   },
   headerGradient: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    height: hp(35),
+    paddingBottom: hp(3),
   },
-  scrollContent: {
-    paddingBottom: theme.spacing.xxl,
-  },
-  profileHeader: {
+  profileSection: {
     alignItems: 'center',
-    paddingTop: hp(8),
-    paddingBottom: theme.spacing.lg,
   },
   avatar: {
+    width: 100,
+    height: 100,
+    borderRadius: 50,
     borderWidth: 3,
-    borderColor: theme.colors.background,
-    ...theme.shadow.lg,
+    borderColor: 'rgba(255,255,255,0.3)',
+  },
+  avatarPlaceholder: {
+    width: 100,
+    height: 100,
+    borderRadius: 50,
+    backgroundColor: 'rgba(255,255,255,0.2)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 3,
+    borderColor: 'rgba(255,255,255,0.3)',
+  },
+  avatarText: {
+    fontSize: hp(4),
+    fontWeight: theme.fonts.bold,
+    color: 'white',
   },
   userName: {
-    fontSize: hp(2.8),
+    fontSize: hp(2.4),
     fontWeight: theme.fonts.bold,
-    color: theme.colors.textLight,
-    textAlign: 'center',
+    color: 'white',
     marginTop: theme.spacing.md,
   },
   userEmail: {
-    fontSize: hp(1.7),
-    color: theme.colors.textLight,
-    opacity: 0.8,
-    textAlign: 'center',
-    marginTop: theme.spacing.xs,
+    fontSize: hp(1.5),
+    color: 'rgba(255,255,255,0.7)',
+    marginTop: 4,
   },
-  memberSince: {
+  statsRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'center',
-    marginTop: theme.spacing.sm,
-    gap: theme.spacing.xs,
-  },
-  joinDate: {
-    fontSize: hp(1.5),
-    color: theme.colors.textLight,
-    opacity: 0.6,
-  },
-  statsContainer: {
-    flexDirection: 'row',
-    backgroundColor: theme.colors.card,
-    marginHorizontal: theme.spacing.md,
+    marginTop: theme.spacing.lg,
+    backgroundColor: 'rgba(255,255,255,0.1)',
     borderRadius: theme.radius.xl,
-    padding: theme.spacing.lg,
-    ...theme.shadow.md,
-    marginTop: -theme.spacing.md,
+    paddingVertical: theme.spacing.md,
+    paddingHorizontal: theme.spacing.xl,
   },
   statItem: {
-    flex: 1,
     alignItems: 'center',
+    paddingHorizontal: theme.spacing.lg,
   },
-  statValue: {
-    fontSize: hp(2.4),
+  statNumber: {
+    fontSize: hp(2.2),
     fontWeight: theme.fonts.bold,
-    color: theme.colors.textDark,
+    color: 'white',
   },
   statLabel: {
-    fontSize: hp(1.5),
-    color: theme.colors.textMuted,
+    fontSize: hp(1.3),
+    color: 'rgba(255,255,255,0.7)',
     marginTop: 2,
   },
   statDivider: {
     width: 1,
-    backgroundColor: theme.colors.backgroundSecondary,
+    height: 30,
+    backgroundColor: 'rgba(255,255,255,0.2)',
   },
-  menuContainer: {
-    padding: theme.spacing.md,
+  content: {
+    flex: 1,
+    marginTop: -hp(2),
+    backgroundColor: theme.colors.background,
+    borderTopLeftRadius: theme.radius.xxl,
+    borderTopRightRadius: theme.radius.xxl,
     paddingTop: theme.spacing.lg,
+  },
+  menuSection: {
+    backgroundColor: theme.colors.card,
+    marginHorizontal: wp(4),
+    borderRadius: theme.radius.xl,
+    overflow: 'hidden',
   },
   menuItem: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: theme.spacing.sm,
+    paddingVertical: theme.spacing.md,
+    paddingHorizontal: theme.spacing.md,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: theme.colors.grayLight,
   },
   menuIconContainer: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
-    backgroundColor: theme.colors.backgroundSecondary,
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: theme.colors.primaryLight + '20',
     alignItems: 'center',
     justifyContent: 'center',
     marginRight: theme.spacing.md,
   },
-  menuTitle: {
+  menuLabel: {
     flex: 1,
-    fontSize: hp(1.9),
-    fontWeight: theme.fonts.medium,
+    fontSize: hp(1.7),
     color: theme.colors.textDark,
+    fontWeight: theme.fonts.medium,
   },
-  logoutItem: {
-    marginHorizontal: theme.spacing.md,
-    marginTop: theme.spacing.md,
-  },
-  logoutIconContainer: {
-    backgroundColor: theme.colors.errorLight,
-  },
-  logoutText: {
-    color: theme.colors.rose,
-  },
-  aboutSection: {
-    margin: theme.spacing.md,
-    marginTop: theme.spacing.lg,
-    padding: theme.spacing.lg,
-    backgroundColor: theme.colors.card,
-    borderRadius: theme.radius.xl,
-    ...theme.shadow.sm,
-  },
-  aboutHeader: {
+  logoutButton: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: theme.spacing.md,
+    justifyContent: 'center',
+    marginHorizontal: wp(4),
+    marginTop: theme.spacing.lg,
+    paddingVertical: theme.spacing.md,
+    backgroundColor: theme.colors.roseLight,
+    borderRadius: theme.radius.xl,
+    gap: theme.spacing.sm,
   },
-  aboutTextContainer: {
-    marginLeft: theme.spacing.md,
+  logoutText: {
+    fontSize: hp(1.7),
+    color: theme.colors.rose,
+    fontWeight: theme.fonts.semibold,
   },
-  aboutTitle: {
-    fontSize: hp(2),
-    fontWeight: theme.fonts.bold,
-    color: theme.colors.textDark,
-  },
-  aboutVersion: {
-    fontSize: hp(1.4),
-    color: theme.colors.textMuted,
-    marginTop: 2,
-  },
-  aboutDescription: {
-    fontSize: hp(1.6),
-    color: theme.colors.text,
-    lineHeight: hp(2.4),
-  },
-  footer: {
-    alignItems: 'center',
-    paddingTop: theme.spacing.xl,
-    paddingBottom: theme.spacing.lg,
-  },
-  footerText: {
-    fontSize: hp(1.5),
-    color: theme.colors.textMuted,
-  },
-  footerSubtext: {
-    fontSize: hp(1.4),
-    color: theme.colors.textMuted,
-    marginTop: theme.spacing.xs,
-    opacity: 0.7,
+  versionText: {
+    textAlign: 'center',
+    color: theme.colors.grayMedium,
+    fontSize: hp(1.3),
+    marginTop: theme.spacing.xl,
   },
 });
-
-export default Profile;

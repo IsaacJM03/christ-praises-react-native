@@ -14,6 +14,7 @@ import {
   Platform,
   Dimensions,
   PanResponder,
+  Alert,
 } from 'react-native';
 import Animated, { 
   FadeIn, 
@@ -26,13 +27,14 @@ import Animated, {
 } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
-import { Gesture, GestureDetector, GestureHandlerRootView } from 'react-native-gesture-handler';
 import { theme } from '../constants/theme';
 import { hp, wp } from '../helpers/common';
 import { usePosts } from '../contexts/PostContext';
 import PostCard from './PostCard';
 import { PostSkeletonList } from './PostSkeleton';
 import CommentItem from './CommentItem';
+import PostOptionsModal from './PostOptionsModal';
+import { authService } from '../lib/authService';
 
 const { height: SCREEN_HEIGHT } = Dimensions.get('window');
 const MAX_SHEET_HEIGHT = SCREEN_HEIGHT * 0.9;
@@ -41,7 +43,6 @@ const MIN_SHEET_HEIGHT = SCREEN_HEIGHT * 0.4;
 
 const PostFeed = ({ 
   onUserPress, 
-  onOptionsPress, 
   ListHeaderComponent 
 }) => {
   const insets = useSafeAreaInsets();
@@ -57,6 +58,7 @@ const PostFeed = ({
     loadMore,
     toggleLike,
     toggleBookmark,
+    deletePost,
     commentsByPost,
     commentsLoading,
     fetchComments,
@@ -73,11 +75,23 @@ const PostFeed = ({
   const [activePostId, setActivePostId] = useState(null);
   const [commentText, setCommentText] = useState('');
   const [showComments, setShowComments] = useState(false);
-  const [isExpanded, setIsExpanded] = useState(false); // Track expansion state with React state
+  const [isExpanded, setIsExpanded] = useState(false);
+  const [selectedPost, setSelectedPost] = useState(null);
+  const [showOptions, setShowOptions] = useState(false);
+  const [currentUserId, setCurrentUserId] = useState(null);
   
   // Sheet animation
   const sheetHeight = useSharedValue(MID_SHEET_HEIGHT);
   const sheetTranslateY = useSharedValue(SCREEN_HEIGHT);
+
+  // Get current user ID
+  useEffect(() => {
+    const loadUser = async () => {
+      const user = await authService.getUser();
+      setCurrentUserId(user?.id);
+    };
+    loadUser();
+  }, []);
 
   // Fetch posts on mount
   useEffect(() => {
@@ -87,14 +101,12 @@ const PostFeed = ({
     }
   }, []);
 
-  // Handle end reached for infinite scroll
   const handleEndReached = useCallback(() => {
     if (!loading && pagination.hasMore) {
       loadMore();
     }
   }, [loading, pagination.hasMore, loadMore]);
 
-  // Handle share
   const handleShare = useCallback(async (postId) => {
     const post = posts.find(p => p.id === postId);
     if (!post) return;
@@ -105,17 +117,15 @@ const PostFeed = ({
     } catch (err) {}
   }, [posts]);
 
-  // Open comments modal
   const openComments = useCallback(async (postId) => {
     setActivePostId(postId);
     setShowComments(true);
-    setIsExpanded(false); // Reset expansion state
+    setIsExpanded(false);
     sheetTranslateY.value = withSpring(0, { damping: 20, stiffness: 200 });
     sheetHeight.value = MID_SHEET_HEIGHT;
     await fetchComments(postId);
   }, [fetchComments]);
 
-  // Close comments modal
   const closeComments = useCallback(() => {
     sheetTranslateY.value = withTiming(SCREEN_HEIGHT, { duration: 250 }, () => {
       runOnJS(setShowComments)(false);
@@ -125,7 +135,6 @@ const PostFeed = ({
     });
   }, []);
 
-  // Handle expand/collapse
   const toggleExpand = useCallback(() => {
     const newExpanded = !isExpanded;
     setIsExpanded(newExpanded);
@@ -135,7 +144,6 @@ const PostFeed = ({
     );
   }, [isExpanded]);
 
-  // Submit comment
   const submitComment = async () => {
     if (!activePostId || !commentText.trim()) return;
     const result = await addComment(activePostId, commentText.trim());
@@ -144,20 +152,41 @@ const PostFeed = ({
     }
   };
 
-  // Handle sheet drag
+  // Handle options press - DEFINE BEFORE renderPost
+  const handleOptionsPress = useCallback((post) => {
+    setSelectedPost(post);
+    setShowOptions(true);
+  }, []);
+
+  // Handle delete post
+  const handleDeletePost = useCallback(async (postId) => {
+    const result = await deletePost(postId);
+    if (!result.success) {
+      Alert.alert('Error', result.message || 'Failed to delete post');
+    }
+  }, [deletePost]);
+
+  // Handle report post
+  const handleReportPost = useCallback(async (postId, reason) => {
+    console.log('Report post:', postId, 'reason:', reason);
+  }, []);
+
+  // Handle edit post
+  const handleEditPost = useCallback((post) => {
+    console.log('Edit post:', post.id);
+    Alert.alert('Coming Soon', 'Post editing will be available soon!');
+  }, []);
+
   const onSheetDrag = useCallback((translationY) => {
     if (translationY > 150) {
       closeComments();
     } else if (translationY < -100) {
-      // Expand to max
       setIsExpanded(true);
       sheetHeight.value = withSpring(MAX_SHEET_HEIGHT, { damping: 20 });
     } else if (translationY > 50) {
-      // Shrink to min
       setIsExpanded(false);
       sheetHeight.value = withSpring(MIN_SHEET_HEIGHT, { damping: 20 });
     } else {
-      // Return to mid
       setIsExpanded(false);
       sheetHeight.value = withSpring(MID_SHEET_HEIGHT, { damping: 20 });
     }
@@ -166,9 +195,7 @@ const PostFeed = ({
   const panResponder = useRef(
     PanResponder.create({
       onStartShouldSetPanResponder: () => true,
-      onMoveShouldSetPanResponder: (_, gestureState) => {
-        return Math.abs(gestureState.dy) > 10;
-      },
+      onMoveShouldSetPanResponder: (_, gestureState) => Math.abs(gestureState.dy) > 10,
       onPanResponderRelease: (_, gestureState) => {
         onSheetDrag(gestureState.dy);
       },
@@ -180,7 +207,7 @@ const PostFeed = ({
     transform: [{ translateY: sheetTranslateY.value }],
   }));
 
-  // Render post item
+  // Render post item - NOW handleOptionsPress is defined above
   const renderPost = useCallback(({ item, index }) => (
     <Animated.View entering={FadeInUp.delay(index * 50).duration(400)}>
       <PostCard
@@ -190,12 +217,11 @@ const PostFeed = ({
         onBookmark={toggleBookmark}
         onShare={handleShare}
         onUserPress={() => onUserPress?.(item.user_id)}
-        onOptionsPress={() => onOptionsPress?.(item)}
+        onOptionsPress={() => handleOptionsPress(item)}
       />
     </Animated.View>
-  ), [toggleLike, toggleBookmark, handleShare, onUserPress, onOptionsPress, openComments]);
+  ), [toggleLike, toggleBookmark, handleShare, onUserPress, openComments, handleOptionsPress]);
 
-  // Render empty state
   const renderEmpty = useCallback(() => {
     if (loading) return null;
     return (
@@ -209,7 +235,6 @@ const PostFeed = ({
     );
   }, [loading]);
 
-  // Render footer
   const renderFooter = useCallback(() => {
     if (!pagination.hasMore && posts.length > 0) {
       return (
@@ -230,7 +255,6 @@ const PostFeed = ({
     return null;
   }, [loading, pagination.hasMore, posts.length]);
 
-  // Render header
   const renderHeader = useCallback(() => (
     <>
       {ListHeaderComponent && <ListHeaderComponent />}
@@ -286,44 +310,26 @@ const PostFeed = ({
         initialNumToRender={5}
       />
 
-      {/* Draggable Comments Bottom Sheet */}
-      <Modal
-        visible={showComments}
-        transparent
-        animationType="none"
-        onRequestClose={closeComments}
-      >
+      {/* Comments Modal */}
+      <Modal visible={showComments} transparent animationType="none" onRequestClose={closeComments}>
         <View style={styles.modalOverlay}>
           <Pressable style={styles.modalBackdrop} onPress={closeComments} />
-          
           <Animated.View style={[styles.commentsSheet, sheetAnimatedStyle, { paddingBottom: insets.bottom }]}>
-            {/* Drag Handle */}
             <View {...panResponder.panHandlers} style={styles.dragHandleContainer}>
               <View style={styles.dragHandle} />
             </View>
-
-            {/* Header */}
             <View style={styles.commentsHeader}>
               <Text style={styles.commentsTitle}>Comments</Text>
               <View style={styles.headerActions}>
                 <Pressable onPress={toggleExpand} style={styles.expandButton}>
-                  <Ionicons 
-                    name={isExpanded ? "chevron-down" : "chevron-up"} 
-                    size={24} 
-                    color={theme.colors.textMuted} 
-                  />
+                  <Ionicons name={isExpanded ? "chevron-down" : "chevron-up"} size={24} color={theme.colors.textMuted} />
                 </Pressable>
                 <Pressable onPress={closeComments} style={styles.closeButton}>
                   <Ionicons name="close" size={24} color={theme.colors.textMuted} />
                 </Pressable>
               </View>
             </View>
-
-            {/* Comments List */}
-            <KeyboardAvoidingView 
-              behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-              style={styles.commentsContainer}
-            >
+            <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={styles.commentsContainer}>
               {commentsLoading[activePostId] ? (
                 <View style={styles.commentsLoading}>
                   <ActivityIndicator size="large" color={theme.colors.primary} />
@@ -340,7 +346,6 @@ const PostFeed = ({
                       onLike={toggleCommentLike}
                       onReply={addReply}
                       onLoadReplies={fetchReplies}
-                      onLikeReply={toggleReplyLike}
                       replies={repliesByComment[item.id] || []}
                       repliesLoading={repliesLoading[item.id]}
                       allReplies={repliesByComment}
@@ -359,8 +364,6 @@ const PostFeed = ({
                   keyboardShouldPersistTaps="handled"
                 />
               )}
-
-              {/* Comment Input */}
               <View style={styles.commentInputContainer}>
                 <View style={styles.commentInputWrapper}>
                   <View style={styles.inputAvatar}>
@@ -380,11 +383,7 @@ const PostFeed = ({
                     onPress={submitComment}
                     disabled={!commentText.trim()}
                   >
-                    <Ionicons 
-                      name="send" 
-                      size={18} 
-                      color={commentText.trim() ? theme.colors.primary : theme.colors.grayMedium} 
-                    />
+                    <Ionicons name="send" size={18} color={commentText.trim() ? theme.colors.primary : theme.colors.grayMedium} />
                   </Pressable>
                 </View>
               </View>
@@ -392,22 +391,30 @@ const PostFeed = ({
           </Animated.View>
         </View>
       </Modal>
+
+      {/* Post Options Modal */}
+      <PostOptionsModal
+        visible={showOptions}
+        onClose={() => {
+          setShowOptions(false);
+          setSelectedPost(null);
+        }}
+        post={selectedPost}
+        isOwnPost={selectedPost?.user_id === currentUserId}
+        onEdit={handleEditPost}
+        onDelete={handleDeletePost}
+        onReport={handleReportPost}
+        onShare={handleShare}
+        onBookmark={toggleBookmark}
+        isBookmarked={selectedPost?.is_bookmarked}
+      />
     </>
   );
 };
 
 const styles = StyleSheet.create({
-  listContent: {
-    paddingBottom: hp(10),
-    flexGrow: 1,
-  },
-  emptyContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    paddingVertical: hp(10),
-    paddingHorizontal: wp(10),
-  },
+  listContent: { paddingBottom: hp(10), flexGrow: 1 },
+  emptyContainer: { flex: 1, justifyContent: 'center', alignItems: 'center', paddingVertical: hp(10), paddingHorizontal: wp(10) },
   emptyEmoji: { fontSize: 60, marginBottom: theme.spacing.md },
   emptyTitle: { fontSize: hp(2.4), fontWeight: theme.fonts.bold, color: theme.colors.textDark, marginBottom: theme.spacing.sm },
   emptySubtitle: { fontSize: hp(1.6), color: theme.colors.textMuted, textAlign: 'center', lineHeight: hp(2.4) },
@@ -418,137 +425,29 @@ const styles = StyleSheet.create({
   endOfFeed: { alignItems: 'center', paddingVertical: theme.spacing.xl, paddingHorizontal: wp(10) },
   endOfFeedText: { fontSize: hp(1.6), color: theme.colors.textMuted, fontWeight: theme.fonts.medium },
   endOfFeedSubtext: { fontSize: hp(1.4), color: theme.colors.grayMedium, marginTop: 4 },
-
-  // Bottom sheet styles
-  modalOverlay: {
-    flex: 1,
-    justifyContent: 'flex-end',
-  },
-  modalBackdrop: {
-    ...StyleSheet.absoluteFillObject,
-    backgroundColor: 'rgba(0,0,0,0.4)',
-  },
-  commentsSheet: {
-    backgroundColor: theme.colors.card,
-    borderTopLeftRadius: 24,
-    borderTopRightRadius: 24,
-    overflow: 'hidden',
-  },
-  dragHandleContainer: {
-    alignItems: 'center',
-    paddingVertical: 12,
-  },
-  dragHandle: {
-    width: 40,
-    height: 4,
-    borderRadius: 2,
-    backgroundColor: theme.colors.grayMedium,
-    opacity: 0.4,
-  },
-  commentsHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: theme.spacing.md,
-    paddingBottom: theme.spacing.sm,
-    borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: theme.colors.grayLight,
-  },
-  commentsTitle: {
-    fontSize: hp(2),
-    fontWeight: theme.fonts.bold,
-    color: theme.colors.textDark,
-  },
-  headerActions: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-  },
-  expandButton: {
-    padding: 8,
-    borderRadius: 20,
-  },
-  closeButton: {
-    padding: 8,
-    borderRadius: 20,
-  },
-  commentsContainer: {
-    flex: 1,
-  },
-  commentsLoading: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    gap: theme.spacing.md,
-  },
-  loadingText: {
-    color: theme.colors.textMuted,
-    fontSize: hp(1.6),
-  },
-  commentsList: {
-    paddingHorizontal: theme.spacing.md,
-    paddingTop: theme.spacing.md,
-    paddingBottom: theme.spacing.md,
-    flexGrow: 1,
-  },
-  noCommentsContainer: {
-    alignItems: 'center',
-    paddingVertical: hp(8),
-  },
-  noComments: {
-    color: theme.colors.textDark,
-    marginTop: theme.spacing.md,
-    fontSize: hp(1.8),
-    fontWeight: theme.fonts.semibold,
-  },
-  noCommentsSubtext: {
-    color: theme.colors.textMuted,
-    fontSize: hp(1.4),
-    marginTop: 4,
-  },
-  commentInputContainer: {
-    backgroundColor: theme.colors.card,
-    borderTopWidth: StyleSheet.hairlineWidth,
-    borderTopColor: theme.colors.grayLight,
-    paddingHorizontal: theme.spacing.md,
-    paddingVertical: theme.spacing.sm,
-  },
-  commentInputWrapper: {
-    flexDirection: 'row',
-    alignItems: 'flex-end',
-    gap: theme.spacing.sm,
-  },
-  inputAvatar: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
-    backgroundColor: theme.colors.primary,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginBottom: 4,
-  },
-  commentInput: {
-    flex: 1,
-    backgroundColor: theme.colors.backgroundSecondary,
-    borderRadius: 20,
-    paddingHorizontal: theme.spacing.md,
-    paddingTop: 10,
-    paddingBottom: 10,
-    fontSize: hp(1.5),
-    color: theme.colors.text,
-    maxHeight: 100,
-    minHeight: 40,
-  },
-  commentSend: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  commentSendDisabled: {
-    opacity: 0.5,
-  },
+  modalOverlay: { flex: 1, justifyContent: 'flex-end' },
+  modalBackdrop: { ...StyleSheet.absoluteFillObject, backgroundColor: 'rgba(0,0,0,0.4)' },
+  commentsSheet: { backgroundColor: theme.colors.card, borderTopLeftRadius: 24, borderTopRightRadius: 24, overflow: 'hidden' },
+  dragHandleContainer: { alignItems: 'center', paddingVertical: 12 },
+  dragHandle: { width: 40, height: 4, borderRadius: 2, backgroundColor: theme.colors.grayMedium, opacity: 0.4 },
+  commentsHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: theme.spacing.md, paddingBottom: theme.spacing.sm, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: theme.colors.grayLight },
+  commentsTitle: { fontSize: hp(2), fontWeight: theme.fonts.bold, color: theme.colors.textDark },
+  headerActions: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  expandButton: { padding: 8, borderRadius: 20 },
+  closeButton: { padding: 8, borderRadius: 20 },
+  commentsContainer: { flex: 1 },
+  commentsLoading: { flex: 1, justifyContent: 'center', alignItems: 'center', gap: theme.spacing.md },
+  loadingText: { color: theme.colors.textMuted, fontSize: hp(1.6) },
+  commentsList: { paddingHorizontal: theme.spacing.md, paddingTop: theme.spacing.md, paddingBottom: theme.spacing.md, flexGrow: 1 },
+  noCommentsContainer: { alignItems: 'center', paddingVertical: hp(8) },
+  noComments: { color: theme.colors.textDark, marginTop: theme.spacing.md, fontSize: hp(1.8), fontWeight: theme.fonts.semibold },
+  noCommentsSubtext: { color: theme.colors.textMuted, fontSize: hp(1.4), marginTop: 4 },
+  commentInputContainer: { backgroundColor: theme.colors.card, borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: theme.colors.grayLight, paddingHorizontal: theme.spacing.md, paddingVertical: theme.spacing.sm },
+  commentInputWrapper: { flexDirection: 'row', alignItems: 'flex-end', gap: theme.spacing.sm },
+  inputAvatar: { width: 32, height: 32, borderRadius: 16, backgroundColor: theme.colors.primary, alignItems: 'center', justifyContent: 'center', marginBottom: 4 },
+  commentInput: { flex: 1, backgroundColor: theme.colors.backgroundSecondary, borderRadius: 20, paddingHorizontal: theme.spacing.md, paddingTop: 10, paddingBottom: 10, fontSize: hp(1.5), color: theme.colors.text, maxHeight: 100, minHeight: 40 },
+  commentSend: { width: 40, height: 40, borderRadius: 20, alignItems: 'center', justifyContent: 'center' },
+  commentSendDisabled: { opacity: 0.5 },
 });
 
 export default PostFeed;

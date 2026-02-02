@@ -322,7 +322,19 @@ const ProfilePopup = ({ visible, onClose, user }) => {
     router.replace('/');
   };
 
+  const handleNavigate = (route) => {
+    onClose();
+    router.push(route);
+  };
+
   if (!visible) return null;
+
+  const menuItems = [
+    { icon: 'person-outline', label: 'View Profile', route: '/(tabs)/profile' },
+    { icon: 'bookmark-outline', label: 'Saved Posts', route: '/(tabs)/saved' },
+    { icon: 'settings-outline', label: 'Settings', route: null },
+    { icon: 'help-circle-outline', label: 'Help & Support', route: null },
+  ];
 
   return (
     <Modal transparent visible={visible} animationType="fade" onRequestClose={onClose}>
@@ -357,14 +369,12 @@ const ProfilePopup = ({ visible, onClose, user }) => {
             </View>
             
             <View style={styles.menuItems}>
-              {[
-                { icon: 'person-outline', label: 'View Profile' },
-                { icon: 'settings-outline', label: 'Settings' },
-                { icon: 'bookmark-outline', label: 'Saved Posts' },
-                { icon: 'help-circle-outline', label: 'Help & Support' },
-              ].map((item, index) => (
+              {menuItems.map((item, index) => (
                 <Animated.View key={item.label} entering={FadeInRight.delay(index * 50)}>
-                  <Pressable style={styles.menuItem}>
+                  <Pressable 
+                    style={styles.menuItem}
+                    onPress={() => item.route ? handleNavigate(item.route) : null}
+                  >
                     <Ionicons name={item.icon} size={22} color={theme.colors.textDark} />
                     <Text style={styles.menuItemText}>{item.label}</Text>
                     <Ionicons name="chevron-forward" size={20} color={theme.colors.textMuted} />

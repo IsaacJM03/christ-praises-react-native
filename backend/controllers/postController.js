@@ -494,6 +494,116 @@ const postController = {
       console.error('Get comment replies error:', error);
       res.status(500).json({ success: false, message: 'Failed to fetch replies' });
     }
+  },
+
+  // Report a post
+  async reportPost(req, res) {
+    try {
+      const { id } = req.params;
+      const { reason } = req.body;
+      const user_id = req.user.id;
+
+      await db.execute(
+        'INSERT INTO post_reports (post_id, user_id, reason) VALUES (?, ?, ?)',
+        [id, user_id, reason]
+      );
+
+      res.json({ success: true, message: 'Report submitted successfully' });
+    } catch (error) {
+      console.error('Report post error:', error);
+      res.status(500).json({ success: false, message: 'Failed to report post' });
+    }
+  },
+
+  // Update a post
+  async updatePost(req, res) {
+    try {
+      const { id } = req.params;
+      const { content } = req.body;
+      const user_id = req.user.id;
+
+      // Check ownership
+      const [posts] = await db.execute(
+        'SELECT * FROM posts WHERE id = ? AND user_id = ?',
+        [id, user_id]
+      );
+
+      if (posts.length === 0) {
+        return res.status(404).json({ success: false, message: 'Post not found or unauthorized' });
+      }
+
+      await db.execute(
+        'UPDATE posts SET content = ?, updated_at = NOW() WHERE id = ?',
+        [content.trim(), id]
+      );
+
+      const [updated] = await db.execute(
+        `SELECT p.*, u.name as user_name, u.image as user_image
+         FROM posts p
+         JOIN users u ON p.user_id = u.id
+         WHERE p.id = ?`,
+        [id]
+      );
+
+      res.json({ success: true, data: updated[0] });
+    } catch (error) {
+      console.error('Update post error:', error);
+      res.status(500).json({ success: false, message: 'Failed to update post' });
+    }
+  },
+
+  // Get bookmarked posts for current user
+  async getBookmarkedPosts(req, res) {
+    try {
+      const user_id = req.user.id;
+      const page = parseInt(req.query.page) || 1;
+      const limit = parseInt(req.query.limit) || 20;
+      const offset = (page - 1) * limit;
+
+      console.log('Fetching bookmarked posts for user:', user_id);
+
+      const [posts] = await db.query(
+        `SELECT p.*, u.name as user_name, u.image as user_image
+         FROM posts p
+         JOIN users u ON p.user_id = u.id
+         JOIN post_bookmarks b ON p.id = b.post_id
+         WHERE b.user_id = ? AND p.deleted_at IS NULL
+         ORDER BY b.created_at DESC
+         LIMIT ${limit} OFFSET ${offset}`,
+        [user_id]
+      );
+
+      console.log('Found bookmarked posts:', posts.length);
+
+      // Add counts and bookmark status for each post
+      const postsWithCounts = await Promise.all(posts.map(async (post) => {
+        const [[likesResult]] = await db.execute(
+          'SELECT COUNT(*) as count FROM post_likes WHERE post_id = ?',
+          [post.id]
+        );
+        const [[commentsResult]] = await db.execute(
+          'SELECT COUNT(*) as count FROM post_comments WHERE post_id = ? AND deleted_at IS NULL',
+          [post.id]
+        );
+        const [[isLikedResult]] = await db.execute(
+          'SELECT COUNT(*) as count FROM post_likes WHERE post_id = ? AND user_id = ?',
+          [post.id, user_id]
+        );
+
+        return {
+          ...post,
+          likes_count: likesResult.count,
+          comments_count: commentsResult.count,
+          is_liked: isLikedResult.count > 0,
+          is_bookmarked: true, // Obviously bookmarked since we're fetching from bookmarks
+        };
+      }));
+
+      res.json({ success: true, data: postsWithCounts });
+    } catch (error) {
+      console.error('Get bookmarked posts error:', error);
+      res.status(500).json({ success: false, message: 'Failed to fetch bookmarked posts' });
+    }
   }
 };
 
