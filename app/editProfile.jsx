@@ -20,6 +20,8 @@ import Animated, { FadeIn, FadeInDown } from 'react-native-reanimated';
 import { theme } from '../constants/theme';
 import { hp, wp } from '../helpers/common';
 import { authService } from '../lib/authService';
+import { uploadService } from '../lib/uploadService';
+import { API_BASE_URL } from '../lib/config';
 
 const EditProfileScreen = () => {
   const { top, bottom } = useSafeAreaInsets();
@@ -27,10 +29,12 @@ const EditProfileScreen = () => {
   
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [uploadingImage, setUploadingImage] = useState(false);
   const [user, setUser] = useState(null);
   const [name, setName] = useState('');
   const [bio, setBio] = useState('');
-  const [image, setImage] = useState(null);
+  const [image, setImage] = useState(null); // This stores the URL to send to server
+  const [imageDisplay, setImageDisplay] = useState(null); // This is for display
   const [hasChanges, setHasChanges] = useState(false);
 
   useEffect(() => {
@@ -39,14 +43,25 @@ const EditProfileScreen = () => {
 
   const loadUser = async () => {
     setLoading(true);
-    const userData = await authService.getUser();
+    // Get fresh data from server
+    const result = await authService.getCurrentUser();
+    const userData = result.success ? result.data : await authService.getUser();
+    
     if (userData) {
       setUser(userData);
       setName(userData.name || '');
       setBio(userData.bio || '');
       setImage(userData.image || null);
+      setImageDisplay(getImageUrl(userData.image));
     }
     setLoading(false);
+  };
+
+  const getImageUrl = (url) => {
+    if (!url) return null;
+    if (url.startsWith('http')) return url;
+    const baseUrl = API_BASE_URL.replace('/api', '');
+    return `${baseUrl}${url}`;
   };
 
   useEffect(() => {
@@ -61,7 +76,6 @@ const EditProfileScreen = () => {
 
   const pickImage = async () => {
     const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
-    
     if (status !== 'granted') {
       Alert.alert('Permission Required', 'Please allow access to your photo library.');
       return;
@@ -75,13 +89,12 @@ const EditProfileScreen = () => {
     });
 
     if (!result.canceled && result.assets[0]) {
-      setImage(result.assets[0].uri);
+      await uploadImage(result.assets[0].uri);
     }
   };
 
   const takePhoto = async () => {
     const { status } = await ImagePicker.requestCameraPermissionsAsync();
-    
     if (status !== 'granted') {
       Alert.alert('Permission Required', 'Please allow camera access.');
       return;
@@ -94,8 +107,27 @@ const EditProfileScreen = () => {
     });
 
     if (!result.canceled && result.assets[0]) {
-      setImage(result.assets[0].uri);
+      await uploadImage(result.assets[0].uri);
     }
+  };
+
+  const uploadImage = async (uri) => {
+    setUploadingImage(true);
+    console.log('Uploading image:', uri);
+    
+    const result = await uploadService.uploadImage(uri, 'profile');
+    console.log('Upload result:', result);
+    
+    if (result.success && result.data) {
+      // Store the relative URL for the server
+      setImage(result.data.url);
+      // Store the full URL for display
+      setImageDisplay(getImageUrl(result.data.url));
+    } else {
+      Alert.alert('Upload Failed', result.message || 'Could not upload image');
+    }
+    
+    setUploadingImage(false);
   };
 
   const showImageOptions = () => {
@@ -105,7 +137,7 @@ const EditProfileScreen = () => {
       [
         { text: 'Take Photo', onPress: takePhoto },
         { text: 'Choose from Library', onPress: pickImage },
-        ...(image ? [{ text: 'Remove Photo', onPress: () => setImage(null), style: 'destructive' }] : []),
+        ...(image ? [{ text: 'Remove Photo', onPress: () => { setImage(null); setImageDisplay(null); }, style: 'destructive' }] : []),
         { text: 'Cancel', style: 'cancel' },
       ]
     );
@@ -120,11 +152,14 @@ const EditProfileScreen = () => {
     setSaving(true);
     
     try {
+      console.log('Saving profile:', { name: name.trim(), bio: bio.trim(), image });
       const result = await authService.updateProfile({
         name: name.trim(),
         bio: bio.trim(),
         image: image,
       });
+
+      console.log('Save result:', result);
 
       if (result.success) {
         Alert.alert('Success', 'Profile updated successfully!', [
@@ -134,6 +169,7 @@ const EditProfileScreen = () => {
         Alert.alert('Error', result.message || 'Failed to update profile');
       }
     } catch (err) {
+      console.error('Save error:', err);
       Alert.alert('Error', 'Something went wrong. Please try again.');
     } finally {
       setSaving(false);
@@ -179,7 +215,7 @@ const EditProfileScreen = () => {
           </Pressable>
           <Text style={styles.headerTitle}>Edit Profile</Text>
           <Pressable 
-            style={[styles.saveButton, !hasChanges && styles.saveButtonDisabled]}
+            style={[styles.saveButton, (!hasChanges || saving) && styles.saveButtonDisabled]}
             onPress={handleSave}
             disabled={!hasChanges || saving}
           >
@@ -192,9 +228,13 @@ const EditProfileScreen = () => {
         </View>
 
         <Animated.View entering={FadeIn.duration(500)} style={styles.avatarSection}>
-          <Pressable onPress={showImageOptions}>
-            {image ? (
-              <Image source={{ uri: image }} style={styles.avatar} />
+          <Pressable onPress={showImageOptions} disabled={uploadingImage}>
+            {uploadingImage ? (
+              <View style={styles.avatarPlaceholder}>
+                <ActivityIndicator size="large" color="white" />
+              </View>
+            ) : imageDisplay ? (
+              <Image source={{ uri: imageDisplay }} style={styles.avatar} />
             ) : (
               <View style={styles.avatarPlaceholder}>
                 <Text style={styles.avatarText}>{avatarLetter}</Text>
@@ -204,8 +244,10 @@ const EditProfileScreen = () => {
               <Ionicons name="camera" size={16} color="white" />
             </View>
           </Pressable>
-          <Pressable onPress={showImageOptions}>
-            <Text style={styles.changePhotoText}>Change Photo</Text>
+          <Pressable onPress={showImageOptions} disabled={uploadingImage}>
+            <Text style={styles.changePhotoText}>
+              {uploadingImage ? 'Uploading...' : 'Change Photo'}
+            </Text>
           </Pressable>
         </Animated.View>
       </LinearGradient>
@@ -269,16 +311,6 @@ const EditProfileScreen = () => {
             </View>
           </View>
         </Animated.View>
-
-        <Animated.View entering={FadeInDown.delay(300).duration(400)}>
-          <Pressable 
-            style={styles.dangerButton}
-            onPress={() => Alert.alert('Delete Account', 'This feature will be available soon.')}
-          >
-            <Ionicons name="trash-outline" size={20} color={theme.colors.rose} />
-            <Text style={styles.dangerButtonText}>Delete Account</Text>
-          </Pressable>
-        </Animated.View>
       </ScrollView>
     </View>
   );
@@ -293,10 +325,10 @@ const styles = StyleSheet.create({
   headerContent: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: wp(4), marginBottom: hp(2) },
   headerButton: { width: 40, height: 40, borderRadius: 20, backgroundColor: 'rgba(255,255,255,0.2)', alignItems: 'center', justifyContent: 'center' },
   headerTitle: { fontSize: hp(2), fontWeight: theme.fonts.bold, color: 'white' },
-  saveButton: { paddingHorizontal: theme.spacing.md, paddingVertical: theme.spacing.sm, borderRadius: theme.radius.lg, backgroundColor: 'rgba(255,255,255,0.2)', minWidth: 70, alignItems: 'center' },
-  saveButtonDisabled: { opacity: 0.5 },
+  saveButton: { paddingHorizontal: theme.spacing.md, paddingVertical: theme.spacing.sm, borderRadius: theme.radius.lg, backgroundColor: 'rgba(255,255,255,0.25)', minWidth: 70, alignItems: 'center' },
+  saveButtonDisabled: { backgroundColor: 'rgba(255,255,255,0.1)' },
   saveButtonText: { fontSize: hp(1.6), fontWeight: theme.fonts.semibold, color: 'white' },
-  saveButtonTextDisabled: { opacity: 0.7 },
+  saveButtonTextDisabled: { opacity: 0.5 },
   avatarSection: { alignItems: 'center' },
   avatar: { width: 100, height: 100, borderRadius: 50, borderWidth: 3, borderColor: 'rgba(255,255,255,0.3)' },
   avatarPlaceholder: { width: 100, height: 100, borderRadius: 50, backgroundColor: 'rgba(255,255,255,0.2)', alignItems: 'center', justifyContent: 'center', borderWidth: 3, borderColor: 'rgba(255,255,255,0.3)' },
@@ -313,13 +345,11 @@ const styles = StyleSheet.create({
   input: { flex: 1, fontSize: hp(1.6), color: theme.colors.textDark },
   bioWrapper: { alignItems: 'flex-start', height: 'auto', minHeight: 100, paddingVertical: theme.spacing.sm },
   bioIcon: { marginTop: 4 },
-  bioInput: { minHeight: 80, textAlignVertical: 'top' },
+  bioInput: { minHeight: 80, textAlignVertical: 'top', paddingTop: 0 },
   bioCounter: { fontSize: hp(1.3), color: theme.colors.grayMedium, textAlign: 'right', marginTop: 4 },
   infoRow: { flexDirection: 'row', alignItems: 'center', paddingVertical: theme.spacing.sm },
   infoIcon: { width: 40, height: 40, borderRadius: 20, backgroundColor: theme.colors.backgroundSecondary, alignItems: 'center', justifyContent: 'center', marginRight: theme.spacing.md },
   infoContent: { flex: 1 },
   infoLabel: { fontSize: hp(1.4), color: theme.colors.textMuted },
   infoValue: { fontSize: hp(1.6), color: theme.colors.textDark, fontWeight: theme.fonts.medium, marginTop: 2 },
-  dangerButton: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', paddingVertical: theme.spacing.md, backgroundColor: theme.colors.roseLight, borderRadius: theme.radius.xl, gap: theme.spacing.sm, marginTop: theme.spacing.md },
-  dangerButtonText: { fontSize: hp(1.6), color: theme.colors.rose, fontWeight: theme.fonts.semibold },
 });

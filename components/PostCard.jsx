@@ -13,6 +13,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
 import { theme } from '../constants/theme';
 import { hp, wp } from '../helpers/common';
+import { API_BASE_URL } from '../lib/config';
 
 const AnimatedPressable = Animated.createAnimatedComponent(Pressable);
 
@@ -160,6 +161,15 @@ const PostCard = ({
     ? content.substring(0, 150) + '...' 
     : content;
 
+  const getImageUrl = (url) => {
+    if (!url) return null;
+    if (url.startsWith('http')) return url;
+    const baseUrl = API_BASE_URL.replace('/api', '');
+    return `${baseUrl}${url}`;
+  };
+
+  const imageUrl = getImageUrl(post.image_url);
+
   return (
     <Animated.View style={[styles.container, cardAnimatedStyle]}>
       {/* Card inner shadow/glow effect */}
@@ -224,18 +234,14 @@ const PostCard = ({
           </View>
 
           {/* Post Image */}
-          {image_url && (
-            <View style={styles.imageContainer}>
+          {imageUrl && (
+            <Animated.View entering={FadeIn.duration(300)} style={styles.imageContainer}>
               <Image 
-                source={{ uri: image_url }} 
-                style={styles.postImage} 
-                resizeMode="cover" 
+                source={{ uri: imageUrl }} 
+                style={styles.postImage}
+                resizeMode="cover"
               />
-              <LinearGradient
-                colors={['transparent', 'rgba(0,0,0,0.1)']}
-                style={styles.imageOverlay}
-              />
-            </View>
+            </Animated.View>
           )}
         </DoubleTapLike>
 
@@ -430,16 +436,14 @@ const styles = StyleSheet.create({
     fontSize: 14,
   },
   imageContainer: {
-    marginHorizontal: -16,
-    marginBottom: 12,
-    borderRadius: 16,
+    marginTop: theme.spacing.sm,
+    borderRadius: theme.radius.lg,
     overflow: 'hidden',
-    position: 'relative',
   },
   postImage: {
     width: '100%',
-    height: hp(28),
-    backgroundColor: theme.colors.backgroundSecondary,
+    height: 250,
+    borderRadius: theme.radius.lg,
   },
   imageOverlay: {
     position: 'absolute',

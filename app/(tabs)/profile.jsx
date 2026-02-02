@@ -9,6 +9,8 @@ import Animated, { FadeIn, FadeInDown } from 'react-native-reanimated';
 import { theme } from '../../constants/theme';
 import { hp, wp } from '../../helpers/common';
 import { authService } from '../../lib/authService';
+import { API_BASE_URL } from '../../lib/config';
+import { useFocusEffect } from 'expo-router';
 
 const ProfileScreen = () => {
   const { top, bottom } = useSafeAreaInsets();
@@ -17,13 +19,23 @@ const ProfileScreen = () => {
   const [refreshing, setRefreshing] = useState(false);
   const [stats, setStats] = useState({ posts: 0, followers: 0, following: 0 });
 
+  // Refresh user data when screen is focused (to see updates after editing)
+  useFocusEffect(
+    useCallback(() => {
+      loadUser();
+    }, [])
+  );
+
   const loadUser = useCallback(async () => {
-    const userData = await authService.getUser();
-    console.log('User data:', userData);
-    setUser(userData);
-    
-    // TODO: Fetch actual stats from API
-    // For now, using placeholder
+    // First try to get from server for fresh data
+    const result = await authService.getCurrentUser();
+    if (result.success && result.data) {
+      setUser(result.data);
+    } else {
+      // Fallback to stored data
+      const userData = await authService.getUser();
+      setUser(userData);
+    }
   }, []);
 
   useEffect(() => {
@@ -90,7 +102,16 @@ const ProfileScreen = () => {
     { icon: 'information-circle-outline', label: 'About', onPress: handleAbout },
   ];
 
-  // Get display name - prioritize name over email
+  // Get the image URL properly
+  const getImageUrl = (url) => {
+    if (!url) return null;
+    if (url.startsWith('http')) return url;
+    // Construct full URL from relative path
+    const baseUrl = API_BASE_URL.replace('/api', '');
+    return `${baseUrl}${url}`;
+  };
+
+  const profileImageUrl = getImageUrl(user?.image);
   const displayName = user?.name || user?.email?.split('@')[0] || 'User';
   const displayEmail = user?.email || '';
   const avatarLetter = (user?.name || user?.email || 'U').charAt(0).toUpperCase();
@@ -104,8 +125,8 @@ const ProfileScreen = () => {
         style={[styles.headerGradient, { paddingTop: top + hp(2) }]}
       >
         <Animated.View entering={FadeIn.duration(500)} style={styles.profileSection}>
-          {user?.image ? (
-            <Image source={{ uri: user.image }} style={styles.avatar} />
+          {profileImageUrl ? (
+            <Image source={{ uri: profileImageUrl }} style={styles.avatar} />
           ) : (
             <View style={styles.avatarPlaceholder}>
               <Text style={styles.avatarText}>{avatarLetter}</Text>

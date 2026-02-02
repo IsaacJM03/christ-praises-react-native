@@ -22,6 +22,7 @@ import { hp, wp } from '../../helpers/common';
 import { PostProvider } from '../../contexts/PostContext';
 import PostFeed from '../../components/PostFeed';
 import QuickPostModal from '../../components/QuickPostModal';
+import CreatePostModal from '../../components/CreatePostModal';
 import { Ionicons } from '@expo/vector-icons';
 import { authService } from '../../lib/authService';
 import { useRouter } from 'expo-router';
@@ -725,9 +726,20 @@ const styles = StyleSheet.create({
   // FAB
   fab: {
     position: 'absolute',
-    bottom: hp(3),
-    right: wp(5),
-    ...theme.shadow.lg,
+    bottom: hp(12),
+    right: wp(4),
+    width: 56,
+    height: 56,
+    borderRadius: 28,
+    backgroundColor: theme.colors.primary,
+    alignItems: 'center',
+    justifyContent: 'center',
+    elevation: 8,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 6,
+    zIndex: 100,
   },
   fabGradient: {
     width: 60,
