@@ -14,6 +14,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { theme } from '../constants/theme';
 import { hp, wp } from '../helpers/common';
 import { API_BASE_URL } from '../lib/config';
+import { FadeIn } from 'react-native-reanimated';
 
 const AnimatedPressable = Animated.createAnimatedComponent(Pressable);
 
@@ -124,6 +125,7 @@ const PostCard = ({
 
   const cardScale = useSharedValue(1);
   const [isExpanded, setIsExpanded] = useState(false);
+  const [imageError, setImageError] = useState(false);
 
   // Format time ago
   const formatTimeAgo = (dateString) => {
@@ -168,7 +170,17 @@ const PostCard = ({
     return `${baseUrl}${url}`;
   };
 
-  const imageUrl = getImageUrl(post.image_url);
+  const postImageUrl = getImageUrl(image_url);
+  const userImageUrl = getImageUrl(user_image);
+
+  // Debug log
+  React.useEffect(() => {
+    if (image_url) {
+      console.log('=== Post Image Debug ===');
+      console.log('Raw image_url:', image_url);
+      console.log('Full postImageUrl:', postImageUrl);
+    }
+  }, [image_url, postImageUrl]);
 
   return (
     <Animated.View style={[styles.container, cardAnimatedStyle]}>
@@ -221,27 +233,42 @@ const PostCard = ({
         {/* Content */}
         <DoubleTapLike onDoubleTap={handleDoubleTap}>
           <View style={styles.contentContainer}>
-            <Text style={styles.content}>
-              {displayContent}
-            </Text>
-            {shouldTruncate && (
-              <Pressable onPress={() => setIsExpanded(!isExpanded)}>
-                <Text style={styles.readMore}>
-                  {isExpanded ? 'Show less' : 'Read more'}
-                </Text>
-              </Pressable>
-            )}
+            {content ? (
+              <>
+                <Text style={styles.content}>{displayContent}</Text>
+                {shouldTruncate && (
+                  <Pressable onPress={() => setIsExpanded(!isExpanded)}>
+                    <Text style={styles.readMore}>
+                      {isExpanded ? 'Show less' : 'Read more'}
+                    </Text>
+                  </Pressable>
+                )}
+              </>
+            ) : null}
           </View>
 
-          {/* Post Image */}
-          {imageUrl && (
-            <Animated.View entering={FadeIn.duration(300)} style={styles.imageContainer}>
+          {/* Post Image - Only show if URL exists and no error */}
+          {postImageUrl && !imageError && (
+            <View style={styles.imageContainer}>
               <Image 
-                source={{ uri: imageUrl }} 
+                source={{ uri: postImageUrl }} 
                 style={styles.postImage}
                 resizeMode="cover"
+                onError={(e) => {
+                  console.log('Image failed to load:', postImageUrl, e.nativeEvent.error);
+                  setImageError(true);
+                }}
+                onLoad={() => console.log('Image loaded successfully:', postImageUrl)}
               />
-            </Animated.View>
+            </View>
+          )}
+          
+          {/* Show placeholder if image failed */}
+          {postImageUrl && imageError && (
+            <View style={styles.imageErrorContainer}>
+              <Ionicons name="image-outline" size={40} color={theme.colors.grayMedium} />
+              <Text style={styles.imageErrorText}>Image unavailable</Text>
+            </View>
           )}
         </DoubleTapLike>
 
@@ -439,18 +466,25 @@ const styles = StyleSheet.create({
     marginTop: theme.spacing.sm,
     borderRadius: theme.radius.lg,
     overflow: 'hidden',
+    backgroundColor: theme.colors.grayLight,
   },
   postImage: {
     width: '100%',
     height: 250,
     borderRadius: theme.radius.lg,
   },
-  imageOverlay: {
-    position: 'absolute',
-    bottom: 0,
-    left: 0,
-    right: 0,
-    height: 40,
+  imageErrorContainer: {
+    marginTop: theme.spacing.sm,
+    height: 150,
+    borderRadius: theme.radius.lg,
+    backgroundColor: theme.colors.backgroundSecondary,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  imageErrorText: {
+    marginTop: theme.spacing.sm,
+    color: theme.colors.grayMedium,
+    fontSize: hp(1.4),
   },
   statsRow: {
     flexDirection: 'row',
