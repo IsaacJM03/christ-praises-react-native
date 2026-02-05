@@ -1,46 +1,51 @@
 export const theme = {
   colors: {
-    primary: '#FF6C00',
-    primaryDark: '#E55A00',
-    primaryLight: '#FF8A3D',
-    dark: '#1a1a2e',
-    darkLight: '#16213e',
-    gray: '#e3e3e3',
-    grayMedium: '#9ca3af',
-    grayDark: '#6b7280',
-
-    text: '#494949',
-    textLight: '#f5f5f5',
-    textDark: '#1d1d1d',
-    textMuted: '#6b7280',
-
-    rose: '#ef4444',
-    roseLight: '#f87171',
-
-    background: '#ffffff',
-    backgroundDark: '#0f0f23',
-    backgroundSecondary: '#f8f9fa',
-
-    card: '#ffffff',
-    cardDark: '#1e1e3f',
-    cardBorder: '#e5e7eb',
-
-    success: '#10b981',
-    successLight: '#d1fae5',
-    warning: '#f59e0b',
-    warningLight: '#fef3c7',
-    error: '#ef4444',
-    errorLight: '#fee2e2',
-
+    // Primary - Vibrant teal/green
+    primary: '#00A896',
+    primaryDark: '#007F6E',
+    primaryLight: '#02C8A7',
+    
+    // Accent colors
+    secondary: '#FF6B6B',
+    accent: '#FFE66D',
+    
+    // Rose/Pink for likes and alerts
+    rose: '#FF6B6B',
+    roseLight: '#FFE5E5',
+    
+    // Text colors
+    text: '#2D3436',
+    textDark: '#1A1A2E',
+    textLight: '#FFFFFF',
+    textMuted: '#636E72',
+    
+    // Background colors
+    background: '#F8FAFA',
+    backgroundSecondary: '#F0F4F4',
+    card: '#FFFFFF',
+    
+    // Gray scale
+    grayLight: '#E8ECEC',
+    grayMedium: '#A0AEC0',
+    grayDark: '#4A5568',
+    
+    // Status colors
+    success: '#00B894',
+    warning: '#FDCB6E',
+    error: '#E74C3C',
+    info: '#0984E3',
+    
+    // Gradients
     gradient: {
-      primary: ['#FF6C00', '#FF8A3D'],
-      dark: ['#1a1a2e', '#16213e'],
-      auth: ['#1a1a2e', '#0f0f23', '#16213e'],
+      primary: ['#00A896', '#007F6E'],
+      secondary: ['#FF6B6B', '#EE5A5A'],
+      accent: ['#FFE66D', '#FFD93D'],
+      auth: ['#00A896', '#007F6E', '#005F56'],
+      card: ['#FFFFFF', '#F8FAFA'],
+      sunset: ['#FF6B6B', '#FFE66D'],
     },
-
-    overlay: 'rgba(0, 0, 0, 0.5)',
-    overlayLight: 'rgba(0, 0, 0, 0.3)',
   },
+  
   fonts: {
     regular: '400',
     medium: '500',
@@ -48,15 +53,7 @@ export const theme = {
     bold: '700',
     extraBold: '800',
   },
-  radius: {
-    xs: 6,
-    sm: 10,
-    md: 14,
-    lg: 18,
-    xl: 22,
-    xxl: 28,
-    full: 9999,
-  },
+  
   spacing: {
     xs: 4,
     sm: 8,
@@ -65,32 +62,14 @@ export const theme = {
     xl: 32,
     xxl: 48,
   },
-  shadow: {
-    sm: {
-      shadowColor: '#000',
-      shadowOffset: { width: 0, height: 1 },
-      shadowOpacity: 0.1,
-      shadowRadius: 2,
-      elevation: 2,
-    },
-    md: {
-      shadowColor: '#000',
-      shadowOffset: { width: 0, height: 4 },
-      shadowOpacity: 0.15,
-      shadowRadius: 8,
-      elevation: 4,
-    },
-    lg: {
-      shadowColor: '#000',
-      shadowOffset: { width: 0, height: 10 },
-      shadowOpacity: 0.2,
-      shadowRadius: 15,
-      elevation: 8,
-    },
-  },
-  animation: {
-    fast: 150,
-    normal: 300,
-    slow: 500,
+  
+  radius: {
+    xs: 4,
+    sm: 8,
+    md: 12,
+    lg: 16,
+    xl: 20,
+    xxl: 28,
+    full: 9999,
   },
 };

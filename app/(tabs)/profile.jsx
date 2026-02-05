@@ -63,7 +63,7 @@ const ProfileScreen = () => {
           style: 'destructive',
           onPress: async () => {
             await authService.logout();
-            router.replace('/');
+            router.replace('/welcome');
           }
         },
       ]

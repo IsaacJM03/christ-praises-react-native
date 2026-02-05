@@ -6,19 +6,17 @@ import Animated, {
   withSpring,
   withSequence,
   withTiming,
-  interpolate,
-  runOnJS,
 } from 'react-native-reanimated';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
+import * as Haptics from 'expo-haptics';
 import { theme } from '../constants/theme';
 import { hp, wp } from '../helpers/common';
 import { API_BASE_URL } from '../lib/config';
-import { FadeIn } from 'react-native-reanimated';
 
 const AnimatedPressable = Animated.createAnimatedComponent(Pressable);
 
-// Double tap to like
+// Enhanced Double tap to like with haptics
 const DoubleTapLike = ({ children, onDoubleTap }) => {
   const lastTap = React.useRef(0);
   const heartScale = useSharedValue(0);
@@ -32,16 +30,16 @@ const DoubleTapLike = ({ children, onDoubleTap }) => {
   const handlePress = () => {
     const now = Date.now();
     if (now - lastTap.current < 300) {
-      // Double tap detected
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
       heartScale.value = withSequence(
-        withSpring(1.2, { damping: 10 }),
+        withSpring(1.4, { damping: 8, stiffness: 200 }),
         withTiming(1, { duration: 100 }),
-        withTiming(0, { duration: 300 })
+        withTiming(0, { duration: 400 })
       );
       heartOpacity.value = withSequence(
         withTiming(1, { duration: 100 }),
-        withTiming(1, { duration: 400 }),
-        withTiming(0, { duration: 300 })
+        withTiming(1, { duration: 500 }),
+        withTiming(0, { duration: 400 })
       );
       onDoubleTap?.();
     }
@@ -52,14 +50,14 @@ const DoubleTapLike = ({ children, onDoubleTap }) => {
     <Pressable onPress={handlePress} style={styles.doubleTapContainer}>
       {children}
       <Animated.View style={[styles.doubleTapHeart, heartStyle]}>
-        <Ionicons name="heart" size={80} color={theme.colors.rose} />
+        <Ionicons name="heart" size={100} color={theme.colors.rose} />
       </Animated.View>
     </Pressable>
   );
 };
 
-// Animated Action Button with ripple effect
-const ActionButton = ({ icon, iconFilled, isActive, count, activeColor, onPress, label }) => {
+// Enhanced Action Button with ripple and haptics
+const ActionButton = ({ icon, iconFilled, isActive, count, activeColor, onPress }) => {
   const scale = useSharedValue(1);
   const bgOpacity = useSharedValue(0);
 
@@ -72,24 +70,25 @@ const ActionButton = ({ icon, iconFilled, isActive, count, activeColor, onPress,
   }));
 
   const handlePress = () => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     scale.value = withSequence(
-      withSpring(0.8, { damping: 10, stiffness: 400 }),
-      withSpring(1.2, { damping: 10, stiffness: 400 }),
-      withSpring(1, { damping: 15, stiffness: 300 })
+      withSpring(0.7, { damping: 10, stiffness: 400 }),
+      withSpring(1.2, { damping: 8, stiffness: 300 }),
+      withSpring(1, { damping: 12, stiffness: 200 })
     );
     bgOpacity.value = withSequence(
       withTiming(1, { duration: 100 }),
-      withTiming(0, { duration: 300 })
+      withTiming(0, { duration: 400 })
     );
     onPress?.();
   };
 
   return (
     <AnimatedPressable style={[styles.actionButton, animatedStyle]} onPress={handlePress}>
-      <Animated.View style={[styles.actionButtonBg, bgStyle, { backgroundColor: activeColor + '20' }]} />
+      <Animated.View style={[styles.actionButtonBg, bgStyle, { backgroundColor: activeColor + '25' }]} />
       <Ionicons
         name={isActive ? iconFilled : icon}
-        size={20}
+        size={22}
         color={isActive ? activeColor : theme.colors.textMuted}
       />
       {count > 0 && (
@@ -124,15 +123,14 @@ const PostCard = ({
   } = post;
 
   const cardScale = useSharedValue(1);
+  const cardElevation = useSharedValue(8);
   const [isExpanded, setIsExpanded] = useState(false);
   const [imageError, setImageError] = useState(false);
 
-  // Format time ago
   const formatTimeAgo = (dateString) => {
     const date = new Date(dateString);
     const now = new Date();
     const diffInSeconds = Math.floor((now - date) / 1000);
-
     if (diffInSeconds < 60) return 'now';
     if (diffInSeconds < 3600) return `${Math.floor(diffInSeconds / 60)}m`;
     if (diffInSeconds < 86400) return `${Math.floor(diffInSeconds / 3600)}h`;
@@ -142,50 +140,47 @@ const PostCard = ({
 
   const cardAnimatedStyle = useAnimatedStyle(() => ({
     transform: [{ scale: cardScale.value }],
+    elevation: cardElevation.value,
   }));
 
   const handlePressIn = () => {
     cardScale.value = withSpring(0.98, { damping: 15, stiffness: 300 });
+    cardElevation.value = withTiming(4, { duration: 150 });
   };
 
   const handlePressOut = () => {
     cardScale.value = withSpring(1, { damping: 15, stiffness: 300 });
+    cardElevation.value = withTiming(8, { duration: 150 });
   };
 
   const handleDoubleTap = () => {
-    if (!is_liked) {
-      onLike?.(id);
-    }
+    if (!is_liked) onLike?.(id);
   };
 
   const shouldTruncate = content?.length > 150;
-  const displayContent = shouldTruncate && !isExpanded 
-    ? content.substring(0, 150) + '...' 
-    : content;
+  const displayContent = shouldTruncate && !isExpanded ? content.substring(0, 150) + '...' : content;
+  const displayName = user_name && !user_name.includes('@') ? user_name : user_name?.split('@')[0] || 'User';
+  const avatarLetter = displayName.charAt(0).toUpperCase();
 
   const getImageUrl = (url) => {
     if (!url) return null;
     if (url.startsWith('http')) return url;
-    const baseUrl = API_BASE_URL.replace('/api', '');
-    return `${baseUrl}${url}`;
+    return `${API_BASE_URL.replace('/api', '')}${url}`;
   };
 
   const postImageUrl = getImageUrl(image_url);
-  const userImageUrl = getImageUrl(user_image);
-
-  // Debug log
-  React.useEffect(() => {
-    if (image_url) {
-      console.log('=== Post Image Debug ===');
-      console.log('Raw image_url:', image_url);
-      console.log('Full postImageUrl:', postImageUrl);
-    }
-  }, [image_url, postImageUrl]);
 
   return (
     <Animated.View style={[styles.container, cardAnimatedStyle]}>
-      {/* Card inner shadow/glow effect */}
       <View style={styles.cardInner}>
+        {/* Gradient accent line */}
+        <LinearGradient
+          colors={[theme.colors.primary, theme.colors.primaryLight]}
+          start={{ x: 0, y: 0 }}
+          end={{ x: 1, y: 0 }}
+          style={styles.accentLine}
+        />
+
         {/* Header */}
         <View style={styles.header}>
           <Pressable 
@@ -196,27 +191,18 @@ const PostCard = ({
           >
             <View style={styles.avatarWrapper}>
               {user_image ? (
-                <Image source={{ uri: user_image }} style={styles.avatar} />
+                <Image source={{ uri: getImageUrl(user_image) }} style={styles.avatar} />
               ) : (
-                <LinearGradient
-                  colors={[theme.colors.primary, theme.colors.primaryDark]}
-                  style={styles.avatarGradient}
-                >
-                  <Text style={styles.avatarText}>
-                    {user_name?.charAt(0)?.toUpperCase() || '?'}
-                  </Text>
+                <LinearGradient colors={[theme.colors.primary, theme.colors.primaryDark]} style={styles.avatarGradient}>
+                  <Text style={styles.avatarText}>{avatarLetter}</Text>
                 </LinearGradient>
               )}
               <View style={styles.onlineIndicator} />
             </View>
             <View style={styles.userTextContainer}>
               <View style={styles.userNameRow}>
-                <Text style={styles.userName} numberOfLines={1}>
-                  {user_name || 'Unknown'}
-                </Text>
-                <View style={styles.verifiedBadge}>
-                  <Ionicons name="checkmark-circle" size={14} color={theme.colors.primary} />
-                </View>
+                <Text style={styles.userName}>{displayName}</Text>
+                <Ionicons name="checkmark-circle" size={14} color={theme.colors.primary} />
               </View>
               <View style={styles.timeRow}>
                 <Ionicons name="time-outline" size={12} color={theme.colors.textMuted} />
@@ -225,7 +211,11 @@ const PostCard = ({
             </View>
           </Pressable>
           
-          <Pressable style={styles.optionsButton} onPress={onOptionsPress}>
+          <Pressable 
+            style={styles.optionsButton} 
+            onPress={onOptionsPress}
+            onPressIn={() => Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light)}
+          >
             <Ionicons name="ellipsis-horizontal" size={20} color={theme.colors.textMuted} />
           </Pressable>
         </View>
@@ -233,107 +223,54 @@ const PostCard = ({
         {/* Content */}
         <DoubleTapLike onDoubleTap={handleDoubleTap}>
           <View style={styles.contentContainer}>
-            {content ? (
+            {content && (
               <>
                 <Text style={styles.content}>{displayContent}</Text>
                 {shouldTruncate && (
                   <Pressable onPress={() => setIsExpanded(!isExpanded)}>
-                    <Text style={styles.readMore}>
-                      {isExpanded ? 'Show less' : 'Read more'}
-                    </Text>
+                    <Text style={styles.readMore}>{isExpanded ? 'Show less' : 'Read more'}</Text>
                   </Pressable>
                 )}
               </>
-            ) : null}
+            )}
           </View>
 
-          {/* Post Image - Only show if URL exists and no error */}
           {postImageUrl && !imageError && (
             <View style={styles.imageContainer}>
               <Image 
                 source={{ uri: postImageUrl }} 
                 style={styles.postImage}
                 resizeMode="cover"
-                onError={(e) => {
-                  console.log('Image failed to load:', postImageUrl, e.nativeEvent.error);
-                  setImageError(true);
-                }}
-                onLoad={() => console.log('Image loaded successfully:', postImageUrl)}
+                onError={() => setImageError(true)}
               />
-            </View>
-          )}
-          
-          {/* Show placeholder if image failed */}
-          {postImageUrl && imageError && (
-            <View style={styles.imageErrorContainer}>
-              <Ionicons name="image-outline" size={40} color={theme.colors.grayMedium} />
-              <Text style={styles.imageErrorText}>Image unavailable</Text>
             </View>
           )}
         </DoubleTapLike>
 
-        {/* Engagement Stats */}
+        {/* Stats */}
         {(likes_count > 0 || comments_count > 0) && (
           <View style={styles.statsRow}>
             {likes_count > 0 && (
               <View style={styles.statItem}>
-                <View style={styles.statIconGroup}>
-                  <View style={[styles.miniIcon, { backgroundColor: theme.colors.rose }]}>
-                    <Ionicons name="heart" size={10} color="white" />
-                  </View>
+                <View style={[styles.miniIcon, { backgroundColor: theme.colors.rose }]}>
+                  <Ionicons name="heart" size={10} color="white" />
                 </View>
-                <Text style={styles.statText}>
-                  {likes_count} {likes_count === 1 ? 'like' : 'likes'}
-                </Text>
+                <Text style={styles.statText}>{likes_count} {likes_count === 1 ? 'like' : 'likes'}</Text>
               </View>
             )}
             {comments_count > 0 && (
-              <Text style={styles.statText}>
-                {comments_count} {comments_count === 1 ? 'comment' : 'comments'}
-              </Text>
+              <Text style={styles.statText}>{comments_count} {comments_count === 1 ? 'comment' : 'comments'}</Text>
             )}
           </View>
         )}
 
         {/* Actions */}
         <View style={styles.actions}>
-          <ActionButton
-            icon="heart-outline"
-            iconFilled="heart"
-            isActive={is_liked}
-            count={0}
-            activeColor={theme.colors.rose}
-            onPress={() => onLike?.(id)}
-          />
-
-          <ActionButton
-            icon="chatbubble-outline"
-            iconFilled="chatbubble"
-            isActive={false}
-            count={0}
-            activeColor={theme.colors.primary}
-            onPress={() => onComment?.(id)}
-          />
-
-          <ActionButton
-            icon="paper-plane-outline"
-            iconFilled="paper-plane"
-            isActive={false}
-            count={0}
-            activeColor={theme.colors.primary}
-            onPress={() => onShare?.(id)}
-          />
-
+          <ActionButton icon="heart-outline" iconFilled="heart" isActive={is_liked} count={0} activeColor={theme.colors.rose} onPress={() => onLike?.(id)} />
+          <ActionButton icon="chatbubble-outline" iconFilled="chatbubble" isActive={false} count={0} activeColor={theme.colors.primary} onPress={() => onComment?.(id)} />
+          <ActionButton icon="paper-plane-outline" iconFilled="paper-plane" isActive={false} count={0} activeColor={theme.colors.info} onPress={() => onShare?.(id)} />
           <View style={styles.actionSpacer} />
-
-          <ActionButton
-            icon="bookmark-outline"
-            iconFilled="bookmark"
-            isActive={is_bookmarked}
-            count={0}
-            activeColor={theme.colors.primary}
-            onPress={() => onBookmark?.(id)}
-          />
+          <ActionButton icon="bookmark-outline" iconFilled="bookmark" isActive={is_bookmarked} count={0} activeColor={theme.colors.warning} onPress={() => onBookmark?.(id)} />
         </View>
       </View>
     </Animated.View>
@@ -341,210 +278,38 @@ const PostCard = ({
 };
 
 const styles = StyleSheet.create({
-  container: {
-    marginHorizontal: wp(4),
-    marginVertical: hp(0.6),
-  },
-  cardInner: {
-    backgroundColor: theme.colors.card,
-    borderRadius: 20,
-    padding: 16,
-    shadowColor: theme.colors.primary,
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.08,
-    shadowRadius: 12,
-    elevation: 5,
-    borderWidth: 1,
-    borderColor: 'rgba(0,0,0,0.03)',
-  },
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    marginBottom: 12,
-  },
-  userInfo: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    flex: 1,
-  },
-  avatarWrapper: {
-    position: 'relative',
-    marginRight: 12,
-  },
-  avatar: {
-    width: 48,
-    height: 48,
-    borderRadius: 24,
-    borderWidth: 2,
-    borderColor: theme.colors.primaryLight,
-  },
-  avatarGradient: {
-    width: 48,
-    height: 48,
-    borderRadius: 24,
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderWidth: 2,
-    borderColor: theme.colors.primaryLight,
-  },
-  avatarText: {
-    color: 'white',
-    fontSize: 18,
-    fontWeight: theme.fonts.bold,
-  },
-  onlineIndicator: {
-    position: 'absolute',
-    bottom: 2,
-    right: 2,
-    width: 14,
-    height: 14,
-    borderRadius: 7,
-    backgroundColor: '#22C55E',
-    borderWidth: 2.5,
-    borderColor: theme.colors.card,
-  },
-  userTextContainer: {
-    flex: 1,
-  },
-  userNameRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-  },
-  userName: {
-    fontSize: 15,
-    fontWeight: '700',
-    color: theme.colors.textDark,
-    letterSpacing: -0.3,
-  },
-  verifiedBadge: {
-    marginLeft: 2,
-  },
-  timeRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-    marginTop: 2,
-  },
-  timeAgo: {
-    fontSize: 12,
-    color: theme.colors.textMuted,
-  },
-  optionsButton: {
-    padding: 8,
-    borderRadius: 20,
-    backgroundColor: theme.colors.backgroundSecondary,
-  },
-  doubleTapContainer: {
-    position: 'relative',
-  },
-  doubleTapHeart: {
-    position: 'absolute',
-    top: '50%',
-    left: '50%',
-    marginTop: -40,
-    marginLeft: -40,
-    zIndex: 10,
-  },
-  contentContainer: {
-    marginBottom: 12,
-  },
-  content: {
-    fontSize: 15,
-    color: theme.colors.text,
-    lineHeight: 22,
-    letterSpacing: -0.2,
-  },
-  readMore: {
-    color: theme.colors.primary,
-    fontWeight: '600',
-    marginTop: 4,
-    fontSize: 14,
-  },
-  imageContainer: {
-    marginTop: theme.spacing.sm,
-    borderRadius: theme.radius.lg,
-    overflow: 'hidden',
-    backgroundColor: theme.colors.grayLight,
-  },
-  postImage: {
-    width: '100%',
-    height: 250,
-    borderRadius: theme.radius.lg,
-  },
-  imageErrorContainer: {
-    marginTop: theme.spacing.sm,
-    height: 150,
-    borderRadius: theme.radius.lg,
-    backgroundColor: theme.colors.backgroundSecondary,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  imageErrorText: {
-    marginTop: theme.spacing.sm,
-    color: theme.colors.grayMedium,
-    fontSize: hp(1.4),
-  },
-  statsRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingBottom: 12,
-    marginBottom: 12,
-    borderBottomWidth: 1,
-    borderBottomColor: theme.colors.backgroundSecondary,
-  },
-  statItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-  },
-  statIconGroup: {
-    flexDirection: 'row',
-  },
-  miniIcon: {
-    width: 18,
-    height: 18,
-    borderRadius: 9,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  statText: {
-    fontSize: 13,
-    color: theme.colors.textMuted,
-  },
-  actions: {
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  actionButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingVertical: 8,
-    paddingHorizontal: 14,
-    marginRight: 4,
-    borderRadius: 20,
-    position: 'relative',
-    overflow: 'hidden',
-  },
-  actionButtonBg: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
-    borderRadius: 20,
-  },
-  actionText: {
-    fontSize: 13,
-    color: theme.colors.textMuted,
-    marginLeft: 6,
-    fontWeight: '600',
-  },
-  actionSpacer: {
-    flex: 1,
-  },
+  container: { marginHorizontal: wp(4), marginVertical: hp(0.8) },
+  cardInner: { backgroundColor: theme.colors.card, borderRadius: 20, padding: 16, shadowColor: theme.colors.primary, shadowOffset: { width: 0, height: 6 }, shadowOpacity: 0.12, shadowRadius: 16, elevation: 8, borderWidth: 1, borderColor: 'rgba(0,0,0,0.03)', overflow: 'hidden' },
+  accentLine: { position: 'absolute', top: 0, left: 0, right: 0, height: 3 },
+  header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14 },
+  userInfo: { flexDirection: 'row', alignItems: 'center', flex: 1 },
+  avatarWrapper: { position: 'relative', marginRight: 12 },
+  avatar: { width: 48, height: 48, borderRadius: 24, borderWidth: 2, borderColor: theme.colors.primaryLight + '50' },
+  avatarGradient: { width: 48, height: 48, borderRadius: 24, alignItems: 'center', justifyContent: 'center', borderWidth: 2, borderColor: theme.colors.primaryLight + '50' },
+  avatarText: { color: 'white', fontSize: 18, fontWeight: theme.fonts.bold },
+  onlineIndicator: { position: 'absolute', bottom: 2, right: 2, width: 14, height: 14, borderRadius: 7, backgroundColor: '#22C55E', borderWidth: 2.5, borderColor: theme.colors.card },
+  userTextContainer: { flex: 1 },
+  userNameRow: { flexDirection: 'row', alignItems: 'center', gap: 4 },
+  userName: { fontSize: 15, fontWeight: '700', color: theme.colors.textDark },
+  timeRow: { flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 2 },
+  timeAgo: { fontSize: 12, color: theme.colors.textMuted },
+  optionsButton: { padding: 8, borderRadius: 20, backgroundColor: theme.colors.backgroundSecondary },
+  doubleTapContainer: { position: 'relative' },
+  doubleTapHeart: { position: 'absolute', top: '50%', left: '50%', marginTop: -50, marginLeft: -50, zIndex: 10 },
+  contentContainer: { marginBottom: 12 },
+  content: { fontSize: 15, color: theme.colors.text, lineHeight: 23 },
+  readMore: { color: theme.colors.primary, fontWeight: '600', marginTop: 4, fontSize: 14 },
+  imageContainer: { marginTop: 8, borderRadius: 16, overflow: 'hidden', backgroundColor: theme.colors.grayLight },
+  postImage: { width: '100%', height: 250 },
+  statsRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingBottom: 12, marginBottom: 12, borderBottomWidth: 1, borderBottomColor: theme.colors.backgroundSecondary },
+  statItem: { flexDirection: 'row', alignItems: 'center', gap: 6 },
+  miniIcon: { width: 18, height: 18, borderRadius: 9, alignItems: 'center', justifyContent: 'center' },
+  statText: { fontSize: 13, color: theme.colors.textMuted },
+  actions: { flexDirection: 'row', alignItems: 'center' },
+  actionButton: { flexDirection: 'row', alignItems: 'center', paddingVertical: 10, paddingHorizontal: 14, marginRight: 4, borderRadius: 22, position: 'relative', overflow: 'hidden' },
+  actionButtonBg: { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, borderRadius: 22 },
+  actionText: { fontSize: 13, color: theme.colors.textMuted, marginLeft: 6, fontWeight: '600' },
+  actionSpacer: { flex: 1 },
 });
 
 export default PostCard;
